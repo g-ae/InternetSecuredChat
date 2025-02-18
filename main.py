@@ -9,17 +9,18 @@ def strEncode(type, string):
 
     # Add every char from the string as 3 times \x00 then char encoded in utf-8
     for s in string:
-        msg += 3*b'\x00' + s.encode('utf-8')
+        encoded = s.encode('utf-8')
+        msg += (4-len(encoded))*b'\x00' + encoded
 
     return msg
 
 def main():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
-        s.send(strEncode('t', 'HELlO'))
+        s.send(strEncode('t', '😂Hel'))
         data = s.recv(1024)
 
-    print(data.decode())
+    print(data.decode()[6:].replace("\x00", ""))
 
 if __name__ == '__main__':
     main()
