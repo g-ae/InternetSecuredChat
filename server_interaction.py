@@ -4,20 +4,24 @@ import threading
 HOST = 'vlbelintrocrypto.hevs.ch'
 PORT = 6000
 connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+connection_state = -1   # -1 not connected yet, 0 connection failed, 1 connected
 
 def _decode_data(text):
     return text.decode()[6:].replace("\x00", "")
 
 def open_connection():
+    global connection_state
     try:
         connection.connect((HOST, PORT))
-    except ConnectionRefusedError as e:
+    except (ConnectionRefusedError, socket.gaierror) as e:
         print("The connection couldn't be established.")
         print(e)
+        connection_state = 0
         # créer variable que "window" va chécker pour afficher message d'erreur ou non.
         exit(1)
 
     print("Connection open")
+    connection_state = 1
     try:
         t = threading.Thread(target=handle_message_reception)
         t.start()

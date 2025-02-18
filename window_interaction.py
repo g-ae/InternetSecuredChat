@@ -22,6 +22,16 @@ def load_window():
     # Signals:
     message.returnPressed.connect(send_message)
 
+    # Wait for server connection
+    while server_interaction.connection_state == -1:
+        pass
+
+    # If connection couldn't be established
+    if server_interaction.connection_state == 0:
+        print("Connection failed, window will not open.")
+        exit(1)
+
+    # Connection established, show window
     app.exec()
 
 def add_message(text):
