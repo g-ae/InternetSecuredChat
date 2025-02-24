@@ -28,7 +28,7 @@ def load_window():
 
     # If connection couldn't be established
     if server_interaction.connection_state == 0:
-        print("Connection failed, window will not open.")
+        print("[Window] Connection failed, window will not open.")
         exit(1)
 
     # Connection established, show window
