@@ -6,6 +6,7 @@ HOST = 'vlbelintrocrypto.hevs.ch'
 PORT = 6000
 connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 connection_state = -1   # -1 not connected yet, 0 connection failed, 1 connected
+last_own_sent_message = ""
 
 # ALL
 
@@ -55,15 +56,18 @@ def handle_message_reception():
             data = connection.recv(65536)
         except ConnectionAbortedError:
             exit(1)
-        print(data, _decode_message(data))
-        if not len(_decode_message(data)) == 0:
-            print("<User> " + _decode_message(data))
+        decoded_data = _decode_message(data)
+        global last_own_sent_message
+        if not len(decoded_data) == 0 and decoded_data != last_own_sent_message:
+            last_own_sent_message = ""
             window_interaction.add_message("<User> " + _decode_message(data))
 
 def send_message(text):
-    if not len(text) == 0:
+    global last_own_sent_message
+    if not len(text) == 0 and text != last_own_sent_message:
         connection.send(_str_encode('t', text))
         window_interaction.add_message("<You> " + text)
+        last_own_sent_message = text
 
 # SERVER COMMAND
 

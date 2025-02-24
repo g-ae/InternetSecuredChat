@@ -3,12 +3,14 @@ from PyQt6.QtWidgets import *
 import server_interaction
 
 text_area = ""
+message = ""
 
 def load_window():
     app = QApplication([])
     global text_area
     text_area = QPlainTextEdit()
     text_area.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    global message
     message = QLineEdit()
     layout = QVBoxLayout()
     layout.addWidget(text_area)
@@ -32,11 +34,15 @@ def load_window():
         exit(1)
 
     # Connection established, show window
-    app.exec()
+    out_code = app.exec()
 
     server_interaction.close_connection()
 
+    exit(out_code)
+
 def add_message(text):
+    global message
+    message.setText("")
     global text_area
     text_area.appendPlainText(text)
     return
