@@ -43,11 +43,18 @@ def open_connection():
         print("Stopped by Ctrl+C")
         connection.close()
 
+def close_connection():
+    connection.close()
+    print("Connection closed")
+
 # MESSAGES
 
 def handle_message_reception():
     while True:
-        data = connection.recv(65536)
+        try:
+            data = connection.recv(65536)
+        except ConnectionAbortedError:
+            exit(1)
         print(data, _decode_message(data))
         if not len(_decode_message(data)) == 0:
             print("<User> " + _decode_message(data))

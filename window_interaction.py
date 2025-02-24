@@ -34,6 +34,8 @@ def load_window():
     # Connection established, show window
     app.exec()
 
+    server_interaction.close_connection()
+
 def add_message(text):
     global text_area
     text_area.appendPlainText(text)
