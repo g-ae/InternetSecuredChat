@@ -3,7 +3,13 @@ import window_interaction
 import threading
 
 if __name__ == '__main__':
-    t = threading.Thread(target=window_interaction.load_window)
-    t.start()
+    try:
+        print("Ouverture de la connexion au serveur...")
+        t = threading.Thread(target=server_interaction.open_connection, daemon=True)
+        t.start()
 
-    server_interaction.open_connection()
+        print("Démarrage de la fenêtre...")
+        window_interaction.load_window()  # Exécuter dans le thread principal
+
+    except Exception as e:
+        print(f"Erreur : {e}")
