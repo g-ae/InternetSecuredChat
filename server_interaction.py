@@ -8,6 +8,8 @@ connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 connection_state = -1   # -1 not connected yet, 0 connection failed, 1 connected
 last_own_sent_message = ""
 
+server_messages = []
+
 # ALL
 
 def _str_encode(type, string):
@@ -22,7 +24,12 @@ def _str_encode(type, string):
     return msg
 
 def _decode_message(text):
-    return text.decode()[6:].replace("\x00", "")
+    try:
+        return text.decode("utf-8")[6:].replace("\x00", "")
+    except UnicodeDecodeError:
+        print("Received text couldn't be decoded.")
+        print(f"You received {text}")
+        return ""
 
 def open_connection():
     global connection_state
@@ -56,18 +63,28 @@ def handle_message_reception():
             data = connection.recv(65536)
         except ConnectionAbortedError:
             exit(1)
-        decoded_data = _decode_message(data)
-        global last_own_sent_message
-        if not len(decoded_data) == 0 and decoded_data != last_own_sent_message:
-            last_own_sent_message = ""
-            window_interaction.add_message("<User> " + _decode_message(data))
+
+        if data != b'':
+            if chr(data[3]) == 's':
+                server_messages.append(data)
+            else :
+                decoded_data = _decode_message(data)
+                global last_own_sent_message
+                if not len(decoded_data) == 0 and decoded_data != last_own_sent_message:
+                    last_own_sent_message = ""
+                    window_interaction.add_message("<User> " + _decode_message(data))
 
 def send_message(text):
     global last_own_sent_message
-    if not len(text) == 0 and text != last_own_sent_message:
+    if text.startswith("/"):
+        server_command(text[1:])
+    elif not len(text) == 0 and text != last_own_sent_message:
         connection.send(_str_encode('t', text))
         window_interaction.add_message("<You> " + text)
         last_own_sent_message = text
+
+def send_server_message(text):
+    connection.send(_str_encode('s', text))
 
 # SERVER COMMAND
 
@@ -94,6 +111,15 @@ def server_command_task(text_array):
 
     match (split_text[0]):
         case "shift":
+            if type_code == "encode":
+                send_server_message("task shift encode 6")
+                global server_messages
+                while True:
+                    if len(server_messages) != 0:
+                        print(_decode_message(server_messages[0]))
+                        server_messages = server_messages[1:]
+            elif type_code == "decode":
+                pass
             pass
         case "vigenere":
             pass

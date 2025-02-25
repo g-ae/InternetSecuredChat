@@ -2,8 +2,8 @@ from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 import server_interaction
 
-text_area = ""
 message = ""
+text_area = ""
 
 def load_window():
     app = QApplication([])
@@ -20,6 +20,7 @@ def load_window():
     window.show()
     def send_message():
         server_interaction.send_message(message.text())
+        remove_text_textbox()
 
     # Signals:
     message.returnPressed.connect(send_message)
@@ -41,8 +42,8 @@ def load_window():
     exit(out_code)
 
 def add_message(text):
-    global message
-    message.setText("")
-    global text_area
     text_area.appendPlainText(text)
     return
+
+def remove_text_textbox():
+    message.setText("")
