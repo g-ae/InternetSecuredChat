@@ -4,11 +4,11 @@ import threading
 
 if __name__ == '__main__':
     try:
-        print("Ouverture de la connexion au serveur...")
+        print("[CONNECTION] Opening...")
         t = threading.Thread(target=server_interaction.open_connection, daemon=True)
         t.start()
 
-        print("Démarrage de la fenêtre...")
+        print("[WINDOW]     Opening ...")
         window_interaction.load_window()  # Exécuter dans le thread principal
 
     except Exception as e:

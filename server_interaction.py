@@ -1,6 +1,7 @@
 import socket
 import threading
 import window_interaction
+import time
 
 HOST = 'vlbelintrocrypto.hevs.ch'
 PORT = 6000
@@ -27,8 +28,7 @@ def _decode_message(text):
     try:
         return text.decode("utf-8")[6:].replace("\x00", "")
     except UnicodeDecodeError:
-        print("Received text couldn't be decoded.")
-        print(f"You received {text}")
+        print(f"[DECODING]  Received text couldn't be decoded -> {text}")
         return ""
 
 def open_connection():
@@ -37,23 +37,23 @@ def open_connection():
     try:
         connection.connect((HOST, PORT))
     except (ConnectionRefusedError, socket.gaierror) as e:
-        print("[ServerInteraction] The connection couldn't be established.")
+        print("[CONNECTION] The connection couldn't be established.")
         print(e)
         connection_state = 0
         exit(1)
 
-    print("Connection open")
+    print("[CONNECTION] Open")
     connection_state = 1
     try:
         t = threading.Thread(target=handle_message_reception)
         t.start()
     except KeyboardInterrupt:
-        print("Stopped by Ctrl+C")
+        print("[CONNECTION] Stopped by Ctrl+C")
         connection.close()
 
 def close_connection():
     connection.close()
-    print("Connection closed")
+    print("[CONNECTION] Closed")
 
 # MESSAGES
 
@@ -64,26 +64,28 @@ def handle_message_reception():
         except ConnectionAbortedError:
             exit(1)
 
+        decoded_data = _decode_message(data)
         if data != b'':
             if chr(data[3]) == 's':
                 server_messages.append(data)
+                window_interaction.add_message("<Server> " + decoded_data)
             else :
-                decoded_data = _decode_message(data)
                 global last_own_sent_message
                 if not len(decoded_data) == 0 and decoded_data != last_own_sent_message:
                     last_own_sent_message = ""
-                    window_interaction.add_message("<User> " + _decode_message(data))
+                    window_interaction.add_message("<User> " + decoded_data)
 
 def send_message(text):
     global last_own_sent_message
     if text.startswith("/"):
-        server_command(text[1:])
+        threading.Thread(target=server_command, args=[text[1:]]).start()
     elif not len(text) == 0 and text != last_own_sent_message:
         connection.send(_str_encode('t', text))
         window_interaction.add_message("<You> " + text)
         last_own_sent_message = text
 
 def send_server_message(text):
+    window_interaction.add_message("<You to Server> " + text)
     connection.send(_str_encode('s', text))
 
 # SERVER COMMAND
@@ -112,7 +114,7 @@ def server_command_task(text_array):
     match (split_text[0]):
         case "shift":
             if type_code == "encode":
-                shift_decode(split_text)
+                shift_encode(split_text)
             elif type_code == "decode":
                 pass
             pass
@@ -132,28 +134,47 @@ def server_command_hash(text_array):
 
 # DECODING
 
-def shift_decode (text) :
-    send_server_message("task shift encode 6")
+def shift_encode(text_array):
+    if not text_array[-1].isnumeric():
+        window_interaction.add_message("<Server> You must provide a number of words for encoding.")
+        return
+    if int(text_array[-1]) < 1 or int(text_array[-1]) > 10000:
+        window_interaction.add_message("<Server> Encoding number must be 1<x<10000.")
+        return
+
+    send_server_message(f"task {' '.join(text_array)}")
     global server_messages
     message_to_decode = ''
     key = ''
     message_decoded = ''
+
+    time_waited = 0
     while True:
+        time.sleep(0.5)
+        time_waited += 0.5
         if len(server_messages) == 2:
             message = _decode_message(server_messages[0])
-            print("Server message >>", message)
             key = message.split(' ')[-1]
-            print("Key >>", key)
             message_to_decode = _decode_message(server_messages[1])
-            print("Server message >>", message_to_decode)
             break
+        if time_waited == 2:
+            window_interaction.add_message("<INFO> No info received from server, try again later.")
+            return
+
     for i in message_to_decode:
         message_decoded += chr(ord(i)+int(key))
-    print("Messsage decoded >>", message_decoded)
+
     send_server_message(message_decoded)
     server_messages = []
+
+    time_waited = 0
     while True:
+        time.sleep(0.5)
+        time_waited += 0.5
         if len(server_messages) != 0:
-            print(_decode_message(server_messages[0]))
             server_messages = server_messages[1:]
             break
+
+        if time_waited == 2:
+            window_interaction.add_message("<INFO> No info received from server, try again later.")
+            return
