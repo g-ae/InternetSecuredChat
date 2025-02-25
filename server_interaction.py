@@ -112,12 +112,7 @@ def server_command_task(text_array):
     match (split_text[0]):
         case "shift":
             if type_code == "encode":
-                send_server_message("task shift encode 6")
-                global server_messages
-                while True:
-                    if len(server_messages) != 0:
-                        print(_decode_message(server_messages[0]))
-                        server_messages = server_messages[1:]
+                shift_decode(split_text)
             elif type_code == "decode":
                 pass
             pass
@@ -134,3 +129,31 @@ def server_command_hash(text_array):
             pass
         case "hash":
             pass
+
+# DECODING
+
+def shift_decode (text) :
+    send_server_message("task shift encode 6")
+    global server_messages
+    message_to_decode = ''
+    key = ''
+    message_decoded = ''
+    while True:
+        if len(server_messages) == 2:
+            message = _decode_message(server_messages[0])
+            print("Server message >>", message)
+            key = message.split(' ')[-1]
+            print("Key >>", key)
+            message_to_decode = _decode_message(server_messages[1])
+            print("Server message >>", message_to_decode)
+            break
+    for i in message_to_decode:
+        message_decoded += chr(ord(i)+int(key))
+    print("Messsage decoded >>", message_decoded)
+    send_server_message(message_decoded)
+    server_messages = []
+    while True:
+        if len(server_messages) != 0:
+            print(_decode_message(server_messages[0]))
+            server_messages = server_messages[1:]
+            break
