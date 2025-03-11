@@ -1,10 +1,5 @@
-import socket
-import threading
-from difflib import restore
-from io import text_encoding
-
+import threading, time, re, socket
 import window_interaction
-import time
 
 HOST = 'vlbelintrocrypto.hevs.ch'
 PORT = 6000
@@ -17,17 +12,6 @@ server_messages = []
 # ==========================================================
 #                           ALL
 # ==========================================================
-
-def _str_encode(type, string):
-    # ISC Header + type of message + string length encoded in big-endian
-    msg = b'ISC' + type.encode('utf-8') + len(string).to_bytes(2, byteorder='big')
-
-    # Encode char as unicode (up to 4 chars) -> if is only one, 3 times \x00 then 1 time ascii of char \x97
-    for s in string:
-        encoded = s.encode('utf-8')
-        msg += (4 - len(encoded)) * b'\x00' + encoded
-
-    return msg
 
 
 def single_char_encode(chr):
@@ -62,7 +46,6 @@ def _decode_message(text, from_server = False):
         print(f"[DECODING]  Received text couldn't be decoded -> {text}")
         return ""
 
-
 def open_connection():
     global connection_state
     global connection
@@ -83,11 +66,9 @@ def open_connection():
         print("[CONNECTION] Stopped by Ctrl+C")
         connection.close()
 
-
 def close_connection():
     connection.close()
     print("[CONNECTION] Closed")
-
 
 # ==========================================================
 #                           MESSAGES
@@ -112,7 +93,6 @@ def handle_message_reception():
                     last_own_sent_message = ""
                     window_interaction.add_message("<User> " + decoded_data)
 
-
 def send_message(text):
     global last_own_sent_message
     if text.startswith("/"):
@@ -121,7 +101,6 @@ def send_message(text):
         connection.send(_str_encode('t', text))
         window_interaction.add_message("<You> " + text)
         last_own_sent_message = text
-
 
 def send_server_message(text):
     window_interaction.add_message("<You to Server> " + text)
@@ -143,7 +122,6 @@ def server_command(text):
         case "hash":
             server_command_hash(text.split(' ')[1:])
 
-
 def server_command_task(text_array):
     """
 
@@ -161,19 +139,20 @@ def server_command_task(text_array):
     match (split_text[0]):
         case "shift":
             if type_code == "encode":
-                shift_encode(split_text)
+                shift_vigenere_encode("shift",split_text)
             elif type_code == "decode":
                 pass
         case "vigenere":
             if type_code == "encode":
-                vigenere_encode(split_text)
+                shift_vigenere_encode("vigenere", split_text)
             elif type_code == "decode":
                 pass
         case "RSA":
-            pass
-        case _:
-            pass
+            if type_code == "encode":
+                rsa_encode(split_text)
 
+        case _:
+            window_interaction.add_message("<Server> Error: Unknown task")
 
 def server_command_hash(text_array):
     match text_array[0]:
@@ -187,20 +166,32 @@ def server_command_hash(text_array):
 #                         ENCODING
 # ==========================================================
 
-def shift_encode(text_array):
+def test_encode_input(text_array):
+    """
+    usage: ``if test_encode_input(text_array) == 0: return``
+    :param text_array:
+    :return: 1 if ok, 0 if not ok
+    """
     if not text_array[-1].isnumeric():
         window_interaction.add_message("<Server> You must provide a number of words for encoding.")
-        return
+        return 0
     if int(text_array[-1]) < 1 or int(text_array[-1]) > 10000:
         window_interaction.add_message("<Server> Encoding number must be 1<x<10000.")
-        return
+        return 0
 
     send_server_message(f"task {' '.join(text_array)}")
-    global server_messages
-    message_to_decode = ''
-    key = ''
+    return 1
 
+# type == shift, vigenere
+def shift_vigenere_encode(type, text_array):
+    if test_encode_input(text_array) == 0: return
+
+    global server_messages
+
+    key = ''
+    message_to_decode = ''
     time_waited = 0
+
     while True:
         time.sleep(0.5)
         time_waited += 0.5
@@ -218,8 +209,28 @@ def shift_encode(text_array):
         message_decoded += int_encode(i +  key, 4)
 
     print(message_decoded)
+    message_decoded = ''
 
-    send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode),2) + message_decoded)
+    match type:
+        case "vigenere":
+            full_key = ''
+            index = 0
+            for i in range(len(message_to_decode)):
+                if index == len(key): index = 0
+                full_key += key[index]
+                index += 1
+
+            for i in range(len(message_to_decode)):
+                char = message_to_decode[i]
+                shift = int(abs(ord(char) - ord(full_key[i])))
+                char_encrypted = chr(ord(char) + shift)
+                message_decoded += char_encrypted
+        case "shift":
+            message_decoded = b''
+            for i in message_to_decode:
+                message_decoded += int_encode(i + key, 4)
+
+    send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode), 2) + message_decoded)
 
     server_messages = []
 
@@ -235,59 +246,42 @@ def shift_encode(text_array):
             window_interaction.add_message("<INFO> No info received from server, try again later.")
             return
 
+def rsa_encode(text_array):
+    if test_encode_input(text_array) == 0: return
 
-def vigenere_encode(text_array):
-    if not text_array[-1].isnumeric():
-        window_interaction.add_message("<Server> You must provide a number of words for encoding.")
-        return
-    if int(text_array[-1]) < 1 or int(text_array[-1]) > 10000:
-        window_interaction.add_message("<Server> Encoding number must be 1<x<10000.")
-        return
-
-    send_server_message(f"task {' '.join(text_array)}")
     global server_messages
+
     message_to_decode = ''
-    key = ''
-
-
     time_waited = 0
+    n = 0
+    e = 0
+
     while True:
         time.sleep(0.5)
         time_waited += 0.5
         if len(server_messages) == 2:
             message = _decode_message(server_messages[0])
-            key = message.split(' ')[-1]
+            x = re.findall("[0-9]+",message) # /\d+/ works as well but shows a warning on the console
+            n = int(x[0])
+            e = int(x[1])
+
             message_to_decode = _decode_message(server_messages[1])
             break
         if time_waited == 2:
             window_interaction.add_message("<INFO> No info received from server, try again later.")
             return
 
-    message_decoded = ''
-    full_key = ''
-    index = 0
-    for i in range(len(message_to_decode)):
-        if index == len(key): index = 0
-        full_key += key[index]
-        index += 1
+    msg_bytes = b''
 
-    for i in range(len(message_to_decode)):
-        char = message_to_decode[i]
-        shift = int(abs(ord(char) - ord(full_key[i])))
-        char_encrypted = chr(ord(char) + shift)
-        message_decoded += char_encrypted
+    for c in message_to_decode:
+        msg_bytes += int_encode(rsa_encode_char(ord(c), e, n), 4)
 
-    send_server_message(message_decoded)
-    server_messages = []
+    send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode), 2) + msg_bytes)
 
-    time_waited = 0
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) != 0:
-            server_messages = server_messages[1:]
-            break
-
-        if time_waited == 2:
-            window_interaction.add_message("<INFO> No info received from server, try again later.")
-            return
+def rsa_encode_char(char_ascii, e, n):
+    val = char_ascii
+    for i in range(e):
+        val *= char_ascii
+        val = val % n
+    print(val)
+    return val
