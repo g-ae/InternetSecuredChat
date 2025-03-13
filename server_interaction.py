@@ -31,20 +31,18 @@ def _str_encode(type, string):
 
     return msg
 
-
 def _decode_message(text, from_server = False):
-    try:
-        result = ''
-        int_data = []
-        for i in range(6, len(text), 4):
-            int_data.append(int.from_bytes(text[i:i + 4], "big"))
+    result = ''
+    int_data = []
+    for i in range(6, len(text), 4):
+        int_data.append(int.from_bytes(text[i:i + 4], "big"))
+        try :
             result += text[i:i + 4].decode("utf-8")
+        except :
+            result += '*'
 
-        if from_server : return int_data
-        return result.replace("\x00", "")
-    except UnicodeDecodeError:
-        print(f"[DECODING]  Received text couldn't be decoded -> {text}")
-        return ""
+    if from_server: return int_data
+    return result.replace("\x00", "")
 
 def open_connection():
     global connection_state
@@ -197,7 +195,7 @@ def shift_vigenere_encode(type, text_array):
         time_waited += 0.5
         if len(server_messages) == 2:
             message = _decode_message(server_messages[0])
-            key = int(message.split(' ')[-1])
+            key = message.split(' ')[-1]
             message_to_decode = _decode_message(server_messages[1], True)
             break
         if time_waited == 2:
@@ -205,30 +203,16 @@ def shift_vigenere_encode(type, text_array):
             return
 
     message_decoded = b''
-    for i in message_to_decode:
-        message_decoded += int_encode(i +  key, 4)
-
-    print(message_decoded)
-    message_decoded = ''
 
     match type:
         case "vigenere":
-            full_key = ''
-            index = 0
-            for i in range(len(message_to_decode)):
-                if index == len(key): index = 0
-                full_key += key[index]
-                index += 1
+            for i, c in enumerate(message_to_decode):
+                intKey = int.from_bytes(key[i % len(key)].encode())
+                message_decoded += int_encode(c + intKey, 4)
 
-            for i in range(len(message_to_decode)):
-                char = message_to_decode[i]
-                shift = int(abs(ord(char) - ord(full_key[i])))
-                char_encrypted = chr(ord(char) + shift)
-                message_decoded += char_encrypted
         case "shift":
-            message_decoded = b''
             for i in message_to_decode:
-                message_decoded += int_encode(i + key, 4)
+                message_decoded += int_encode(i + int(key), 4)
 
     send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode), 2) + message_decoded)
 
