@@ -13,7 +13,6 @@ server_messages = []
 #                           ALL
 # ==========================================================
 
-
 def single_char_encode(chr):
     encoded = chr.encode('utf-8')
     return (4 - len(encoded)) * b'\x00' + encoded
@@ -108,7 +107,6 @@ def send_server_message_no_encoding(bytes):
     window_interaction.add_message("<You to Server> " + _decode_message(bytes))
     connection.send(bytes)
 
-
 # ==========================================================
 #                       SERVER COMMAND
 # ==========================================================
@@ -159,7 +157,6 @@ def server_command_hash(text_array):
         case "hash":
             pass
 
-
 # ==========================================================
 #                         ENCODING
 # ==========================================================
@@ -180,8 +177,14 @@ def test_encode_input(text_array):
     send_server_message(f"task {' '.join(text_array)}")
     return 1
 
-# type == shift, vigenere
 def shift_vigenere_encode(type, text_array):
+
+    """ shift_vigenere
+        :param type: string - shift, vigenere
+        :param text_array: array[string] - message
+        This function encode the message and send them
+    """
+
     if test_encode_input(text_array) == 0: return
 
     global server_messages
@@ -255,17 +258,23 @@ def rsa_encode(text_array):
             window_interaction.add_message("<INFO> No info received from server, try again later.")
             return
 
-    msg_bytes = b''
+    message_decoded = b''
 
     for c in message_to_decode:
-        msg_bytes += int_encode(rsa_encode_char(ord(c), e, n), 4)
+        message_decoded += int_encode((pow(int.from_bytes(c.encode()), e, n)), 4)
 
-    send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode), 2) + msg_bytes)
+    send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode), 2) + message_decoded)
 
-def rsa_encode_char(char_ascii, e, n):
-    val = char_ascii
-    for i in range(e):
-        val *= char_ascii
-        val = val % n
-    print(val)
-    return val
+    server_messages = []
+
+    time_waited = 0
+    while True:
+        time.sleep(0.5)
+        time_waited += 0.5
+        if len(server_messages) != 0:
+            server_messages = server_messages[1:]
+            break
+
+        if time_waited == 2:
+            window_interaction.add_message("<INFO> No info received from server, try again later.")
+            return
