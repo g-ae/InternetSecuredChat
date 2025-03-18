@@ -248,20 +248,20 @@ def rsa_encode(text_array):
         time_waited += 0.5
         if len(server_messages) == 2:
             message = _decode_message(server_messages[0])
-            x = re.findall("[0-9]+",message) # /\d+/ works as well but shows a warning on the console
+            x = re.findall("[0-9]+", message) # /\d+/ works as well but shows a warning on the console
             n = int(x[0])
             e = int(x[1])
-
-            message_to_decode = _decode_message(server_messages[1])
+            message_to_decode = _decode_message(server_messages[1], True)
             break
         if time_waited == 2:
             window_interaction.add_message("<INFO> No info received from server, try again later.")
             return
 
     message_decoded = b''
+    print(n, e, message_to_decode)
 
     for c in message_to_decode:
-        message_decoded += int_encode((pow(int.from_bytes(c.encode()), e, n)), 4)
+        message_decoded += int_encode(pow(c, e, n), 4)
 
     send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode), 2) + message_decoded)
 
