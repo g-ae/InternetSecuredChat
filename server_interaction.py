@@ -1,8 +1,8 @@
 import threading, time, re, socket
 import window_interaction
 
-
-connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+stop_event = threading.Event()
+connection = None
 connection_state = -1  # -1 not connected yet, 0 connection failed, 1 connected
 last_own_sent_message = ""
 
@@ -43,9 +43,9 @@ def _decode_message(text, from_server = False):
     return result.replace("\x00", "")
 
 def open_connection():
-    global connection_state
-    global connection
+    global connection_state, connection
     try:
+        connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create new socket
         connection.connect((window_interaction.host, window_interaction.port))
     except (ConnectionRefusedError, socket.gaierror) as e:
         print("[CONNECTION] The connection couldn't be established.")
@@ -55,15 +55,25 @@ def open_connection():
 
     print("[CONNECTION] Open")
     connection_state = 1
+
     try:
+        stop_event.clear()
         t = threading.Thread(target=handle_message_reception)
         t.start()
     except KeyboardInterrupt:
         print("[CONNECTION] Stopped by Ctrl+C")
-        connection.close()
+        close_connection()
 
 def close_connection():
-    connection.close()
+    global connection_state
+    stop_event.set()
+    if connection:  # Check if connection exists
+        try:
+            connection.shutdown(socket.SHUT_RDWR)
+            connection.close()
+        except:
+            pass  # Socket might already be closed
+    connection_state = -1
     print("[CONNECTION] Closed")
 
 #endregion
@@ -74,24 +84,28 @@ def close_connection():
 #region MESSAGES
 
 def handle_message_reception():
-    while True:
-        try:
-            # TODO : handle size message reception
-            data = connection.recv(65536)
-        except ConnectionAbortedError:
-            exit(1)
+    try:
+        while not stop_event.is_set():  # Tant qu'on ne demande pas d'arrêt
+            try:
+                # TODO : handle size message reception
+                data = connection.recv(65536)
+            except ConnectionAbortedError:
+                exit(1)
 
-        decoded_data = _decode_message(data)
+            decoded_data = _decode_message(data)
 
-        if data != b'':
-            if chr(data[3]) == 's':
-                server_messages.append(data)
-                window_interaction.add_message("<Server> " + decoded_data)
-            else:
-                global last_own_sent_message
-                if not len(decoded_data) == 0 and decoded_data != last_own_sent_message:
-                    last_own_sent_message = ""
-                    window_interaction.add_message("<User> " + decoded_data)
+            if data != b'':
+                if chr(data[3]) == 's':
+                    server_messages.append(data)
+                    window_interaction.add_message("<Server> " + decoded_data)
+                else:
+                    global last_own_sent_message
+                    if not len(decoded_data) == 0 and decoded_data != last_own_sent_message:
+                        last_own_sent_message = ""
+                        window_interaction.add_message("<User> " + decoded_data)
+    finally:
+        connection.close()  # Ferme la connexion
+        connection_state = -1  # Met à jour l'état
 
 def send_message(text):
     global last_own_sent_message

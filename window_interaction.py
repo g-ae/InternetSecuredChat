@@ -35,13 +35,18 @@ class ChatWindow(QMainWindow):
         self.lbl_10.setText(str(value))
 
     def _connect_to_server(self):
-        global host
-        host = self.lineEdit_address.text()
-        global port
-        port = int(self.lineEdit_port.text())
-        print("[CONNECTION] Opening...")
-        t = threading.Thread(target=server_interaction.open_connection, daemon=True)
-        t.start()
+        if server_interaction.connection_state == 1:
+            self.btn_connect.setText("CONNECT")
+            server_interaction.close_connection()
+
+        elif server_interaction.connection_state == -1:
+            global host, port
+            host = self.lineEdit_address.text()
+            port = int(self.lineEdit_port.text())
+            server_interaction.stop_event.clear()  # Réinitialise l'Event
+            t = threading.Thread(target=server_interaction.open_connection, daemon=True)
+            t.start()
+            self.btn_connect.setText("DISCONNECT")
 
     def _send_message(self):
         if server_interaction.connection_state == -1 :
