@@ -1,8 +1,7 @@
 import threading, time, re, socket
 import window_interaction
 
-HOST = 'vlbelintrocrypto.hevs.ch'
-PORT = 6000
+
 connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 connection_state = -1  # -1 not connected yet, 0 connection failed, 1 connected
 last_own_sent_message = ""
@@ -47,7 +46,7 @@ def open_connection():
     global connection_state
     global connection
     try:
-        connection.connect((HOST, PORT))
+        connection.connect((window_interaction.host, window_interaction.port))
     except (ConnectionRefusedError, socket.gaierror) as e:
         print("[CONNECTION] The connection couldn't be established.")
         print(e)
@@ -77,6 +76,7 @@ def close_connection():
 def handle_message_reception():
     while True:
         try:
+            # TODO : handle size message reception
             data = connection.recv(65536)
         except ConnectionAbortedError:
             exit(1)
