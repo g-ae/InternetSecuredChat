@@ -9,9 +9,9 @@ last_own_sent_message = ""
 
 server_messages = []
 
-# ==========================================================
-#                           ALL
-# ==========================================================
+
+# ======================================================================================================================
+#region ALL
 
 def single_char_encode(chr):
     encoded = chr.encode('utf-8')
@@ -67,9 +67,12 @@ def close_connection():
     connection.close()
     print("[CONNECTION] Closed")
 
-# ==========================================================
-#                           MESSAGES
-# ==========================================================
+#endregion
+# ======================================================================================================================
+
+
+# ======================================================================================================================
+#region MESSAGES
 
 def handle_message_reception():
     while True:
@@ -107,9 +110,12 @@ def send_server_message_no_encoding(bytes):
     window_interaction.add_message("<You to Server> " + _decode_message(bytes))
     connection.send(bytes)
 
-# ==========================================================
-#                       SERVER COMMAND
-# ==========================================================
+#endregion
+# ======================================================================================================================
+
+
+# ======================================================================================================================
+#region SERVER COMMAND
 
 def server_command(text):
     match text.split(' ')[0]:
@@ -157,9 +163,12 @@ def server_command_hash(text_array):
         case "hash":
             pass
 
-# ==========================================================
-#                         ENCODING
-# ==========================================================
+#endregion
+# ======================================================================================================================
+
+
+# ======================================================================================================================
+#region ENCODING
 
 def test_encode_input(text_array):
     """
@@ -258,13 +267,9 @@ def rsa_encode(text_array):
             return
 
     message_decoded = b''
-    print(n, e, message_to_decode)
-
     for c in message_to_decode:
         message_decoded += int_encode(pow(c, e, n), 4)
-
     send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode), 2) + message_decoded)
-
     server_messages = []
 
     time_waited = 0
@@ -278,3 +283,6 @@ def rsa_encode(text_array):
         if time_waited == 2:
             window_interaction.add_message("<INFO> No info received from server, try again later.")
             return
+
+#endregion
+# ======================================================================================================================
