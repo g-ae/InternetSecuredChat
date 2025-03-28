@@ -35,23 +35,36 @@ class ChatWindow(QMainWindow):
         self.lbl_10.setText(str(value))
 
     def _connect_to_server(self):
+        # Disconnect
         if server_interaction.connection_state == 1:
             self.btn_connect.setText("CONNECT")
             server_interaction.close_connection()
             add_message("<INFO> Disconnected from server")
 
-        elif server_interaction.connection_state == -1:
+        # Connect
+        elif server_interaction.connection_state == -1 or server_interaction.connection_state == 0:
             global host, port
             host = self.lineEdit_address.text()
             port = int(self.lineEdit_port.text())
             server_interaction.stop_event.clear()  # Réinitialise l'Event
             t = threading.Thread(target=server_interaction.open_connection, daemon=True)
             t.start()
-            self.btn_connect.setText("DISCONNECT")
+            self.btn_connect.setText("CONNECTING ...")
+            self.btn_connect.setEnabled(False)
+
+    def connected(self):
+        if server_interaction.connection_state == 1:
+            # connected successfully
             add_message("<INFO> Connected to server")
+            self.btn_connect.setText("DISCONNECT")
+        else:
+            # Connection Error
+            add_message("<INFO> Error while trying to connect to the server. Check it's address and try again !")
+            self.btn_connect.setText("CONNECT")
+        self.btn_connect.setEnabled(True)
 
     def _send_message(self):
-        if server_interaction.connection_state == -1 :
+        if server_interaction.connection_state == -1 or server_interaction.connection_state == 0:
             self._add_message("<INFO> Server not connected")
         else :
             msg = self.lineEdit_message.text()
@@ -59,7 +72,7 @@ class ChatWindow(QMainWindow):
             self.lineEdit_message.clear()
 
     def _send_task(self):
-        if server_interaction.connection_state == -1:
+        if server_interaction.connection_state == -1 or server_interaction.connection_state == 0:
             self._add_message("<INFO> Server not connected")
         else:
             encoding = "Aucun"

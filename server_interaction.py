@@ -44,17 +44,19 @@ def _decode_message(text, from_server = False):
 
 def open_connection():
     global connection_state, connection
+    connection_state = -1
     try:
         connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create new socket
         connection.connect((window_interaction.host, window_interaction.port))
     except (ConnectionRefusedError, socket.gaierror) as e:
         print("[CONNECTION] The connection couldn't be established.")
-        print(e)
         connection_state = 0
+        window_interaction.window.connected()
         exit(1)
 
     print("[CONNECTION] Open")
     connection_state = 1
+    window_interaction.window.connected()
 
     try:
         stop_event.clear()
