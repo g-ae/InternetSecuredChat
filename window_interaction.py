@@ -38,6 +38,7 @@ class ChatWindow(QMainWindow):
         if server_interaction.connection_state == 1:
             self.btn_connect.setText("CONNECT")
             server_interaction.close_connection()
+            add_message("<INFO> Disconnected from server")
 
         elif server_interaction.connection_state == -1:
             global host, port
@@ -47,6 +48,7 @@ class ChatWindow(QMainWindow):
             t = threading.Thread(target=server_interaction.open_connection, daemon=True)
             t.start()
             self.btn_connect.setText("DISCONNECT")
+            add_message("<INFO> Connected to server")
 
     def _send_message(self):
         if server_interaction.connection_state == -1 :
