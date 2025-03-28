@@ -87,8 +87,11 @@ def handle_message_reception():
     try:
         while not stop_event.is_set():  # Tant qu'on ne demande pas d'arrêt
             try:
-                # TODO : handle size message reception
-                data = connection.recv(65536)
+                firstdata = connection.recv(6)
+                data = firstdata + connection.recv(int.from_bytes(firstdata[-2:], "big") * 4)
+
+                # TODO : handle image reception, dismiss it for now atleast
+
             except ConnectionAbortedError:
                 exit(1)
 
