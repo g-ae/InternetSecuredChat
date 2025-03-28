@@ -32,7 +32,7 @@ def _str_encode(type, string):
 def _decode_message(text, from_server = False):
     result = ''
     int_data = []
-    for i in range(6, len(text), 4):
+    for i in range(0, len(text), 4):
         int_data.append(int.from_bytes(text[i:i + 4], "big"))
         try :
             result += text[i:i + 4].decode("utf-8")
@@ -88,17 +88,22 @@ def handle_message_reception():
         while not stop_event.is_set():  # Tant qu'on ne demande pas d'arrêt
             try:
                 firstdata = connection.recv(6)
-                data = firstdata + connection.recv(int.from_bytes(firstdata[-2:], "big") * 4)
+                message_type = firstdata[3]
+                size = firstdata[-2:]
 
-                # TODO : handle image reception, dismiss it for now atleast
-
-            except ConnectionAbortedError:
+                # TODO : Test handling of image reception
+                if message_type == ord('i'):
+                    # 128 * 128 bytes or * 3 ?
+                    connection.recv(int.from_bytes(size[0], "big") * int.from_bytes(size[1], "big"))
+                else:
+                    data = connection.recv(int.from_bytes(size, "big") * 4)
+            except (ConnectionAbortedError, OSError):
                 exit(1)
 
             decoded_data = _decode_message(data)
 
             if data != b'':
-                if chr(data[3]) == 's':
+                if message_type == ord('s'):
                     server_messages.append(data)
                     window_interaction.add_message("<Server> " + decoded_data)
                 else:
@@ -125,7 +130,7 @@ def send_server_message(text):
 
 def send_server_message_no_encoding(bytes):
     window_interaction.add_message("<You to Server> " + _decode_message(bytes))
-    connection.send(bytes)
+    connection.send(b'ISCs' + int_encode(int(len(bytes) / 4), 2)  + bytes)
 
 #endregion
 # ======================================================================================================================
@@ -243,7 +248,7 @@ def shift_vigenere_encode(type, text_array):
             for i in message_to_decode:
                 message_decoded += int_encode(i + int(key), 4)
 
-    send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode), 2) + message_decoded)
+    send_server_message_no_encoding(message_decoded)
 
     server_messages = []
 
@@ -286,7 +291,7 @@ def rsa_encode(text_array):
     message_decoded = b''
     for c in message_to_decode:
         message_decoded += int_encode(pow(c, e, n), 4)
-    send_server_message_no_encoding(b'ISCs' + int_encode(len(message_to_decode), 2) + message_decoded)
+    send_server_message_no_encoding(message_decoded)
     server_messages = []
 
     time_waited = 0
