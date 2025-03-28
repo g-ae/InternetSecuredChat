@@ -176,9 +176,6 @@
       <height>21</height>
      </rect>
     </property>
-    <property name="text">
-     <string>This is a test message</string>
-    </property>
    </widget>
    <widget class="QLabel" name="lbl_06">
     <property name="geometry">
