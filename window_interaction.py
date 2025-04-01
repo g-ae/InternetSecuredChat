@@ -82,7 +82,8 @@ class ChatWindow(QMainWindow):
             # Récupère la taille
             size = str(self.sl_size.value())
 
-            msg = f"/task {encoding} encode {size}"
+            if (self.rd_btn_encode.isChecked()) : msg = f"/task {encoding} encode {size}"
+            else : msg = f"/task {encoding} decode {size}"
             server_interaction.send_message(msg)
 
     def _add_message(self, text):

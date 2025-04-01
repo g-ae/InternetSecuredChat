@@ -225,7 +225,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>ENCODING :</string>
+     <string>TYPE :</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -237,7 +237,7 @@
       <x>670</x>
       <y>430</y>
       <width>431</width>
-      <height>61</height>
+      <height>91</height>
      </rect>
     </property>
     <item>
@@ -255,12 +255,22 @@
       <string>RSA</string>
      </property>
     </item>
+    <item>
+     <property name="text">
+      <string>hash</string>
+     </property>
+    </item>
+    <item>
+     <property name="text">
+      <string>DifHel</string>
+     </property>
+    </item>
    </widget>
    <widget class="QSlider" name="sl_size">
     <property name="geometry">
      <rect>
       <x>670</x>
-      <y>520</y>
+      <y>620</y>
       <width>431</width>
       <height>25</height>
      </rect>
@@ -282,7 +292,7 @@
     <property name="geometry">
      <rect>
       <x>580</x>
-      <y>520</y>
+      <y>620</y>
       <width>81</width>
       <height>21</height>
      </rect>
@@ -298,7 +308,7 @@
     <property name="geometry">
      <rect>
       <x>670</x>
-      <y>510</y>
+      <y>610</y>
       <width>431</width>
       <height>21</height>
      </rect>
@@ -314,7 +324,7 @@
     <property name="geometry">
      <rect>
       <x>670</x>
-      <y>550</y>
+      <y>650</y>
       <width>431</width>
       <height>31</height>
      </rect>
@@ -323,8 +333,62 @@
      <string>SEND</string>
     </property>
    </widget>
+   <widget class="QRadioButton" name="rd_btn_encode">
+    <property name="geometry">
+     <rect>
+      <x>680</x>
+      <y>550</y>
+      <width>100</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Encode</string>
+    </property>
+    <property name="checked">
+     <bool>true</bool>
+    </property>
+    <attribute name="buttonGroup">
+     <string notr="true">btn_groupe_command</string>
+    </attribute>
+   </widget>
+   <widget class="QLabel" name="lbl_11">
+    <property name="geometry">
+     <rect>
+      <x>580</x>
+      <y>550</y>
+      <width>81</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>COMMAND :</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QRadioButton" name="rd_btn_decode">
+    <property name="geometry">
+     <rect>
+      <x>680</x>
+      <y>580</y>
+      <width>100</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Decode</string>
+    </property>
+    <attribute name="buttonGroup">
+     <string notr="true">btn_groupe_command</string>
+    </attribute>
+   </widget>
   </widget>
  </widget>
  <resources/>
  <connections/>
+ <buttongroups>
+  <buttongroup name="btn_groupe_command"/>
+ </buttongroups>
 </ui>
