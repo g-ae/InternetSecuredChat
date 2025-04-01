@@ -43,6 +43,13 @@ def _decode_message(text, from_server = False):
     if from_server: return int_data
     return result.replace("\x00", "")
 
+#endregion
+# ======================================================================================================================
+
+
+# ======================================================================================================================
+#region CONNECTION
+
 def open_connection():
     global connection_state, connection
     connection_state = -1
@@ -106,7 +113,6 @@ def handle_message_reception():
                     continue
 
                 data = connection.recv(int.from_bytes(size, "big") * 4)
-                print(data)
             except (ConnectionAbortedError, OSError):
                 exit(1)
 
@@ -146,7 +152,7 @@ def send_server_message_no_encoding(bytes):
 
 
 # ======================================================================================================================
-#region SERVER COMMAND
+#region TASKS
 
 def server_command(text):
     # command example:
@@ -187,59 +193,6 @@ def server_command(text):
             pass
         case _:
             show_unknown_message(f"task \"{command[0]}\"")
-
-def hash_command_verify(command):
-    global server_messages
-
-    message_to_hash = ''
-    hashed = ''
-    time_waited = 0
-
-    server_messages = []
-
-    send_server_message(f"task {' '.join(command)}")
-
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) == 3:
-            message_to_hash = server_messages[1]
-            hashed = server_messages[2]
-
-            server_messages = []
-            break
-        if time_waited == 3:
-            show_no_info_from_server()
-            return
-
-
-    send_server_message(str(hashlib.sha256(message_to_hash) == hashed).lower())
-
-def hash_command_hash(command):
-    global server_messages
-    server_messages = []
-
-    time_waited = 0
-
-    send_server_message(f"task {' '.join(command)}")
-
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) == 2:
-            message_to_hash = server_messages[1]
-            server_messages = []
-            break
-        if time_waited == 3:
-            show_no_info_from_server()
-            return
-
-
-    hash = hashlib.sha256(_decode_message(message_to_hash).encode())
-    print(message_to_hash)
-    print(hash.hexdigest())
-
-    send_server_message(hash.hexdigest())
 
 def show_unknown_message(unknown_thing):
     comm.chat_message.emit(f"<Server> Error: Unknown {unknown_thing}")
@@ -371,6 +324,7 @@ def rsa_encode(text_array):
 #endregion
 # ======================================================================================================================
 
+
 # ======================================================================================================================
 #region DECODING
 
@@ -383,3 +337,62 @@ def rsa_decode(text_array):
 #endregion
 # ======================================================================================================================
 
+
+# ======================================================================================================================
+#region HASHING
+
+def hash_command_verify(command):
+    global server_messages
+
+    message_to_hash = ''
+    hashed = ''
+    time_waited = 0
+
+    server_messages = []
+
+    send_server_message(f"task {' '.join(command)}")
+
+    while True:
+        time.sleep(0.5)
+        time_waited += 0.5
+        if len(server_messages) == 3:
+            message_to_hash = server_messages[1]
+            hashed = server_messages[2]
+
+            server_messages = []
+            break
+        if time_waited == 3:
+            show_no_info_from_server()
+            return
+
+
+    send_server_message(str(hashlib.sha256(message_to_hash) == hashed).lower())
+
+def hash_command_hash(command):
+    global server_messages
+    server_messages = []
+
+    time_waited = 0
+
+    send_server_message(f"task {' '.join(command)}")
+
+    while True:
+        time.sleep(0.5)
+        time_waited += 0.5
+        if len(server_messages) == 2:
+            message_to_hash = server_messages[1]
+            server_messages = []
+            break
+        if time_waited == 3:
+            show_no_info_from_server()
+            return
+
+
+    hash = hashlib.sha256(_decode_message(message_to_hash).encode())
+    print(message_to_hash)
+    print(hash.hexdigest())
+
+    send_server_message(hash.hexdigest())
+
+#endregion
+# ======================================================================================================================
