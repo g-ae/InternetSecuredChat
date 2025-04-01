@@ -1,5 +1,6 @@
 import threading, time, re, socket
 import window_interaction
+from signals import comm
 
 stop_event = threading.Event()
 connection = None
@@ -107,15 +108,14 @@ def handle_message_reception():
             if data != b'':
                 if message_type == ord('s'):
                     server_messages.append(data)
-                    window_interaction.add_message("<Server> " + decoded_data)
+                    comm.chat_message.emit("<Server> " + decoded_data)
                 else:
                     global last_own_sent_message
                     if not len(decoded_data) == 0 and decoded_data != last_own_sent_message:
                         last_own_sent_message = ""
-                        window_interaction.add_message("<User> " + decoded_data)
-    finally:
-        connection.close()  # Ferme la connexion
-        connection_state = -1  # Met à jour l'état
+                        comm.chat_message.emit("<User> " + decoded_data)
+    except:
+        pass
 
 def send_message(text):
     global last_own_sent_message
@@ -123,15 +123,15 @@ def send_message(text):
         threading.Thread(target=server_command, args=[text[1:]]).start()
     elif not len(text) == 0 and text != last_own_sent_message:
         connection.send(_str_encode('t', text))
-        window_interaction.add_message("<You> " + text)
+        comm.chat_message.emit("<You> " + text)
         last_own_sent_message = text
 
 def send_server_message(text):
-    window_interaction.add_message("<You to Server> " + text)
+    comm.chat_message.emit("<You to Server> " + text)
     connection.send(_str_encode('s', text))
 
 def send_server_message_no_encoding(bytes):
-    window_interaction.add_message("<You to Server> " + _decode_message(bytes))
+    comm.chat_message.emit("<You to Server> " + _decode_message(bytes))
     connection.send(b'ISCs' + int_encode(int(len(bytes) / 4), 2)  + bytes)
 
 #endregion
@@ -179,7 +179,7 @@ def server_command_task(text_array):
             elif type_code == "decode":
                 rsa_decode(split_text)
         case _:
-            window_interaction.add_message("<Server> Error: Unknown task")
+            comm.chat_message.emit("<Server> Error: Unknown task")
 
 def server_command_hash(text_array):
     match text_array[0]:
@@ -195,10 +195,10 @@ def test_input(text_array):
     :return: 1 if ok, 0 if not ok
     """
     if not text_array[-1].isnumeric():
-        window_interaction.add_message("<Server> You must provide a number of words.")
+        comm.chat_message.emit("<Server> You must provide a number of words.")
         return 0
     if int(text_array[-1]) < 1 or int(text_array[-1]) > 10000:
-        window_interaction.add_message("<Server> Number must be 1<x<10000.")
+        comm.chat_message.emit("<Server> Number must be 1<x<10000.")
         return 0
 
     send_server_message(f"task {' '.join(text_array)}")
@@ -236,7 +236,7 @@ def shift_vigenere_encode(type, text_array):
             message_to_decode = _decode_message(server_messages[1], True)
             break
         if time_waited == 2:
-            window_interaction.add_message("<INFO> No info received from server, try again later.")
+            comm.chat_message.emit("<INFO> No info received from server, try again later.")
             return
 
     message_decoded = b''
@@ -264,7 +264,7 @@ def shift_vigenere_encode(type, text_array):
             break
 
         if time_waited == 2:
-            window_interaction.add_message("<INFO> No info received from server, try again later.")
+            comm.chat_message.emit("<INFO> No info received from server, try again later.")
             return
 
 def rsa_encode(text_array):
@@ -288,7 +288,7 @@ def rsa_encode(text_array):
             message_to_decode = _decode_message(server_messages[1], True)
             break
         if time_waited == 2:
-            window_interaction.add_message("<INFO> No info received from server, try again later.")
+            comm.chat_message.emit("<INFO> No info received from server, try again later.")
             return
 
     message_decoded = b''
@@ -306,7 +306,7 @@ def rsa_encode(text_array):
             break
 
         if time_waited == 2:
-            window_interaction.add_message("<INFO> No info received from server, try again later.")
+            comm.chat_message.emit("<INFO> No info received from server, try again later.")
             return
 
 #endregion

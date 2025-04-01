@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow
 from PyQt6.QtCore import Qt
 from PyQt6 import uic
 import server_interaction
+from signals import comm
 
 class ChatWindow(QMainWindow):
     def __init__(self):
@@ -32,6 +33,9 @@ class ChatWindow(QMainWindow):
         self.lineEdit_message.returnPressed.connect(self._send_message)
         self.btn_send.clicked.connect(self._send_task)
 
+        # Plain Text
+        comm.chat_message.connect(self._add_message)
+
     def _update_size_label(self, value):
         self.lbl_10.setText(str(value))
 
@@ -40,7 +44,7 @@ class ChatWindow(QMainWindow):
         if server_interaction.connection_state == 1:
             self.btn_connect.setText("CONNECT")
             server_interaction.close_connection()
-            add_message("<INFO> Disconnected from server")
+            self._add_message("<INFO> Disconnected from server")
 
         # Connect
         elif server_interaction.connection_state == -1 or server_interaction.connection_state == 0:
@@ -56,11 +60,11 @@ class ChatWindow(QMainWindow):
     def connected(self):
         if server_interaction.connection_state == 1:
             # connected successfully
-            add_message("<INFO> Connected to server")
+            self._add_message("<INFO> Connected to server")
             self.btn_connect.setText("DISCONNECT")
         else:
             # Connection Error
-            add_message("<INFO> Error while trying to connect to the server. Check it's address and try again !")
+            self._add_message("<INFO> Error while trying to connect to the server. Check it's address and try again !")
             self.btn_connect.setText("CONNECT")
         self.btn_connect.setEnabled(True)
 
@@ -117,7 +121,3 @@ def load_window():
     window.show()
     app.exec()
     server_interaction.close_connection()
-
-def add_message(text):
-    window._add_message(text)
-    return
