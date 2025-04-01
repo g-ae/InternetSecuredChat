@@ -28,6 +28,7 @@ class ChatWindow(QMainWindow):
 
         # Buttons
         self.btn_connect.clicked.connect(self._connect_to_server)
+        self.listWidget_encode.itemSelectionChanged.connect(self._change_encoding_values)
         self.lineEdit_message.returnPressed.connect(self._send_message)
         self.btn_send.clicked.connect(self._send_task)
 
@@ -82,12 +83,37 @@ class ChatWindow(QMainWindow):
             # Récupère la taille
             size = str(self.sl_size.value())
 
-            if (self.rd_btn_encode.isChecked()) : msg = f"/task {encoding} encode {size}"
-            else : msg = f"/task {encoding} decode {size}"
+            if (self.rd_btn_encode.isChecked()) :
+                command = self.rd_btn_encode.text()
+            else :
+                command = self.rd_btn_encode.text()
+
+            if encoding == "hash":
+                msg = f"/task {encoding} {command}"
+            else:
+                msg = f"/task {encoding} {command} {size}"
+
             server_interaction.send_message(msg)
 
     def _add_message(self, text):
         self.plainTextEdit_chat.appendPlainText(text)
+
+    def _change_encoding_values(self):
+        match self.listWidget_encode.currentItem().text():
+            case "hash":
+                self.rd_btn_encode.setEnabled(True)
+                self.rd_btn_decode.setEnabled(True)
+                self.rd_btn_encode.setText("verify")
+                self.rd_btn_decode.setText("hash")
+            case "DifHel":
+                self.rd_btn_encode.setEnabled(False)
+                self.rd_btn_decode.setEnabled(False)
+            case _:
+                self.rd_btn_encode.setEnabled(True)
+                self.rd_btn_decode.setEnabled(True)
+                self.rd_btn_encode.setText("encode")
+                self.rd_btn_decode.setText("decode")
+
 
 app = QApplication([])
 window = ChatWindow()
