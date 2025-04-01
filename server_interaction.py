@@ -165,18 +165,19 @@ def server_command_task(text_array):
     match (split_text[0]):
         case "shift":
             if type_code == "encode":
-                shift_vigenere_encode("shift",split_text)
+                shift_vigenere_encode("shift", split_text)
             elif type_code == "decode":
-                pass
+                shift_vigenere_decode("shift", split_text)
         case "vigenere":
             if type_code == "encode":
                 shift_vigenere_encode("vigenere", split_text)
             elif type_code == "decode":
-                pass
+                shift_vigenere_decode("vigenere", split_text)
         case "RSA":
             if type_code == "encode":
                 rsa_encode(split_text)
-
+            elif type_code == "decode":
+                rsa_decode(split_text)
         case _:
             window_interaction.add_message("<Server> Error: Unknown task")
 
@@ -187,28 +188,28 @@ def server_command_hash(text_array):
         case "hash":
             pass
 
-#endregion
-# ======================================================================================================================
-
-
-# ======================================================================================================================
-#region ENCODING
-
-def test_encode_input(text_array):
+def test_input(text_array):
     """
     usage: ``if test_encode_input(text_array) == 0: return``
     :param text_array:
     :return: 1 if ok, 0 if not ok
     """
     if not text_array[-1].isnumeric():
-        window_interaction.add_message("<Server> You must provide a number of words for encoding.")
+        window_interaction.add_message("<Server> You must provide a number of words.")
         return 0
     if int(text_array[-1]) < 1 or int(text_array[-1]) > 10000:
-        window_interaction.add_message("<Server> Encoding number must be 1<x<10000.")
+        window_interaction.add_message("<Server> Number must be 1<x<10000.")
         return 0
 
     send_server_message(f"task {' '.join(text_array)}")
     return 1
+
+#endregion
+# ======================================================================================================================
+
+
+# ======================================================================================================================
+#region ENCODING
 
 def shift_vigenere_encode(type, text_array):
 
@@ -218,7 +219,7 @@ def shift_vigenere_encode(type, text_array):
         This function encode the message and send them
     """
 
-    if test_encode_input(text_array) == 0: return
+    if test_input(text_array) == 0: return
 
     global server_messages
 
@@ -267,7 +268,7 @@ def shift_vigenere_encode(type, text_array):
             return
 
 def rsa_encode(text_array):
-    if test_encode_input(text_array) == 0: return
+    if test_input(text_array) == 0: return
 
     global server_messages
 
@@ -310,3 +311,16 @@ def rsa_encode(text_array):
 
 #endregion
 # ======================================================================================================================
+
+# ======================================================================================================================
+#region DECODING
+
+def shift_vigenere_decode(type, text_array):
+    pass
+
+def rsa_decode(text_array):
+    pass
+
+#endregion
+# ======================================================================================================================
+
