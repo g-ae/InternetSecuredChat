@@ -1,9 +1,9 @@
-import threading, time, re, socket
+import threading, time, re, socket, hashlib
 import window_interaction
 from signals import comm
 
 stop_event = threading.Event()
-connection = None
+connection: socket.socket = None  # type socket so that there are no errors in the rest of the code
 connection_state = -1  # -1 not connected yet, 0 connection failed, 1 connected
 last_own_sent_message = ""
 
@@ -91,15 +91,22 @@ def handle_message_reception():
         while not stop_event.is_set():  # Tant qu'on ne demande pas d'arrêt
             try:
                 firstdata = connection.recv(6)
+                if firstdata == b'':
+                    # NO DATA
+                    continue
+
                 message_type = firstdata[3]
                 size = firstdata[-2:]
 
                 # TODO : Test handling of image reception
                 if message_type == ord('i'):
+                    print("Received image request")
                     # 128 * 128 bytes or * 3 ?
-                    connection.recv(int.from_bytes(size[0], "big") * int.from_bytes(size[1], "big"))
-                else:
-                    data = connection.recv(int.from_bytes(size, "big") * 4)
+                    connection.recv(size[0] * size[1])
+                    continue
+
+                data = connection.recv(int.from_bytes(size, "big") * 4)
+                print(data)
             except (ConnectionAbortedError, OSError):
                 exit(1)
 
@@ -142,51 +149,103 @@ def send_server_message_no_encoding(bytes):
 #region SERVER COMMAND
 
 def server_command(text):
-    match text.split(' ')[0]:
-        case "task":
-            server_command_task(text.split(' ')[1:])
-        case "hash":
-            server_command_hash(text.split(' ')[1:])
+    # command example:
+    # task shift encode 10
+    # task hash verify
 
-def server_command_task(text_array):
-    """
+    command = text.split(' ')
+    if command[0] != "task":
+        print("Unknown command")
+        return
 
-    :param text: whole text with or without "task" -> splitted by " ", ex : ['shift', 'encode', '2000']
-    :return:
-    """
+    # Remove "task" from command
+    del command[0]
 
-    split_text = text_array
-    if split_text[0] == "task":
-        del split_text[0]
+    # gives "encode"/"decode" or "verify"/"hash"
+    type_code = command[1]
 
-    # gives "encode" or "decode"
-    type_code = split_text[1]
-
-    match (split_text[0]):
-        case "shift":
+    match (command[0]):
+        case "shift" | "vigenere":
             if type_code == "encode":
-                shift_vigenere_encode("shift", split_text)
+                shift_vigenere_encode(command[0], command)
             elif type_code == "decode":
-                shift_vigenere_decode("shift", split_text)
-        case "vigenere":
-            if type_code == "encode":
-                shift_vigenere_encode("vigenere", split_text)
-            elif type_code == "decode":
-                shift_vigenere_decode("vigenere", split_text)
+                shift_vigenere_decode(command[0], command)
         case "RSA":
             if type_code == "encode":
-                rsa_encode(split_text)
+                rsa_encode(command)
             elif type_code == "decode":
-                rsa_decode(split_text)
-        case _:
-            comm.chat_message.emit("<Server> Error: Unknown task")
-
-def server_command_hash(text_array):
-    match text_array[0]:
-        case "verify":
-            pass
+                rsa_decode(command)
         case "hash":
+            if type_code == "verify":
+                hash_command_verify(command)
+            elif type_code == "hash":
+                hash_command_hash(command)
+            else:
+                show_unknown_message(f"command \"{type_code}\"")
+        case "DifHel":
+            # TODO: DifHel task
             pass
+        case _:
+            show_unknown_message(f"task \"{command[0]}\"")
+
+def hash_command_verify(command):
+    global server_messages
+
+    message_to_hash = ''
+    hashed = ''
+    time_waited = 0
+
+    server_messages = []
+
+    send_server_message(f"task {' '.join(command)}")
+
+    while True:
+        time.sleep(0.5)
+        time_waited += 0.5
+        if len(server_messages) == 3:
+            message_to_hash = server_messages[1]
+            hashed = server_messages[2]
+
+            server_messages = []
+            break
+        if time_waited == 3:
+            show_no_info_from_server()
+            return
+
+
+    send_server_message(str(hashlib.sha256(message_to_hash) == hashed).lower())
+
+def hash_command_hash(command):
+    global server_messages
+    server_messages = []
+
+    time_waited = 0
+
+    send_server_message(f"task {' '.join(command)}")
+
+    while True:
+        time.sleep(0.5)
+        time_waited += 0.5
+        if len(server_messages) == 2:
+            message_to_hash = server_messages[1]
+            server_messages = []
+            break
+        if time_waited == 3:
+            show_no_info_from_server()
+            return
+
+
+    hash = hashlib.sha256(_decode_message(message_to_hash).encode())
+    print(message_to_hash)
+    print(hash.hexdigest())
+
+    send_server_message(hash.hexdigest())
+
+def show_unknown_message(unknown_thing):
+    comm.chat_message.emit(f"<Server> Error: Unknown {unknown_thing}")
+
+def show_no_info_from_server():
+    comm.chat_message.emit("<INFO> No info received from server, try again later.")
 
 def test_input(text_array):
     """
@@ -211,10 +270,10 @@ def test_input(text_array):
 # ======================================================================================================================
 #region ENCODING
 
-def shift_vigenere_encode(type, text_array):
+def shift_vigenere_encode(encryption_type, text_array):
 
     """ shift_vigenere
-        :param type: string - shift, vigenere
+        :param encryption_type: string - shift, vigenere
         :param text_array: array[string] - message
         This function encode the message and send them
     """
@@ -241,7 +300,7 @@ def shift_vigenere_encode(type, text_array):
 
     message_decoded = b''
 
-    match type:
+    match encryption_type:
         case "vigenere":
             for i, c in enumerate(message_to_decode):
                 intKey = int.from_bytes(key[i % len(key)].encode())
@@ -316,7 +375,7 @@ def rsa_encode(text_array):
 #region DECODING
 
 def shift_vigenere_decode(type, text_array):
-    print('shif_vigenere_decode')
+    print('shift_vigenere_decode')
 
 def rsa_decode(text_array):
     print('rsa_decode')
