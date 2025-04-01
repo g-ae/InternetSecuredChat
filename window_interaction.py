@@ -19,8 +19,8 @@ class ChatWindow(QMainWindow):
         self._update_size_label(self.sl_size.value())
 
         # Select the first encode by default
-        if self.listWidget_encode.count() > 0:
-            self.listWidget_encode.setCurrentRow(0)
+        if self.listWidget_type.count() > 0:
+            self.listWidget_type.setCurrentRow(0)
 
     def _connect_signals(self):
         # Slider
@@ -28,7 +28,7 @@ class ChatWindow(QMainWindow):
 
         # Buttons
         self.btn_connect.clicked.connect(self._connect_to_server)
-        self.listWidget_encode.itemSelectionChanged.connect(self._change_encoding_values)
+        self.listWidget_type.itemSelectionChanged.connect(self._change_encoding_values)
         self.lineEdit_message.returnPressed.connect(self._send_message)
         self.btn_send.clicked.connect(self._send_task)
 
@@ -77,21 +77,15 @@ class ChatWindow(QMainWindow):
             self._add_message("<INFO> Server not connected")
         else:
             encoding = "Aucun"
-            if self.listWidget_encode.currentItem():
-                encoding = self.listWidget_encode.currentItem().text()
+            if self.listWidget_type.currentItem(): encoding = self.listWidget_type.currentItem().text()
 
-            # Récupère la taille
             size = str(self.sl_size.value())
 
-            if (self.rd_btn_encode.isChecked()) :
-                command = self.rd_btn_encode.text()
-            else :
-                command = self.rd_btn_encode.text()
+            if (self.rd_btn_encode.isChecked()) : command = self.rd_btn_encode.text()
+            else : command = self.rd_btn_decode.text()
 
-            if encoding == "hash":
-                msg = f"/task {encoding} {command}"
-            else:
-                msg = f"/task {encoding} {command} {size}"
+            if encoding == "hash": msg = f"/task {encoding} {command}"
+            else: msg = f"/task {encoding} {command} {size}"
 
             server_interaction.send_message(msg)
 
@@ -99,7 +93,7 @@ class ChatWindow(QMainWindow):
         self.plainTextEdit_chat.appendPlainText(text)
 
     def _change_encoding_values(self):
-        match self.listWidget_encode.currentItem().text():
+        match self.listWidget_type.currentItem().text():
             case "hash":
                 self.rd_btn_encode.setEnabled(True)
                 self.rd_btn_decode.setEnabled(True)
@@ -113,7 +107,6 @@ class ChatWindow(QMainWindow):
                 self.rd_btn_decode.setEnabled(True)
                 self.rd_btn_encode.setText("encode")
                 self.rd_btn_decode.setText("decode")
-
 
 app = QApplication([])
 window = ChatWindow()

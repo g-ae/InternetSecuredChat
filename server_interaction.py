@@ -316,10 +316,10 @@ def rsa_encode(text_array):
 #region DECODING
 
 def shift_vigenere_decode(type, text_array):
-    pass
+    print('shif_vigenere_decode')
 
 def rsa_decode(text_array):
-    pass
+    print('rsa_decode')
 
 #endregion
 # ======================================================================================================================

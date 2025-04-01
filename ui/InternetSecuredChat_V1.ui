@@ -231,7 +231,7 @@
      <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
     </property>
    </widget>
-   <widget class="QListWidget" name="listWidget_encode">
+   <widget class="QListWidget" name="listWidget_type">
     <property name="geometry">
      <rect>
       <x>670</x>
