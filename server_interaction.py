@@ -133,7 +133,7 @@ def handle_message_reception():
 def send_message(text):
     global last_own_sent_message
     if text.startswith("/"):
-        threading.Thread(target=server_command, args=[text[1:]]).start()
+        threading.Thread(target=server_task_command, args=[text[1:]]).start()
     elif not len(text) == 0 and text != last_own_sent_message:
         connection.send(_str_encode('t', text))
         comm.chat_message.emit("<You> " + text)
@@ -154,51 +154,58 @@ def send_server_message_no_encoding(bytes):
 # ======================================================================================================================
 #region TASKS
 
-def server_command(text):
+def server_task_command(text):
     # command example:
     # task shift encode 10
     # task hash verify
 
     command = text.split(' ')
     if command[0] != "task":
-        print("Unknown command")
+        show_error_message(f"Unknown command \"{command[0]}\"")
         return
+
 
     # Remove "task" from command
     del command[0]
 
-    # gives "encode"/"decode" or "verify"/"hash"
-    type_code = command[1]
+    # Test there's another word than "task"
+    if len(command) == 0:
+        show_error_message("More arguments needed")
+        return
+
+    # command[1] gives "encode"/"decode" or "verify"/"hash"
 
     match (command[0]):
         case "shift" | "vigenere":
-            if type_code == "encode":
+            if command[1] == "encode":
                 shift_vigenere_encode(command[0], command)
-            elif type_code == "decode":
+            elif command[1] == "decode":
                 shift_vigenere_decode(command[0], command)
         case "RSA":
-            if type_code == "encode":
+            if command[1] == "encode":
                 rsa_encode(command)
-            elif type_code == "decode":
+            elif command[1] == "decode":
                 rsa_decode(command)
         case "hash":
-            if type_code == "verify":
+            if command[1] == "verify":
                 hash_command_verify(command)
-            elif type_code == "hash":
+            elif command[1] == "hash":
                 hash_command_hash(command)
             else:
-                show_unknown_message(f"command \"{type_code}\"")
+                show_error_message(f"Unknown command \"{command[1]}\"")
         case "DifHel":
-            # TODO: DifHel task
+            send_server_message("task " + ' '.join(command))
             pass
         case _:
-            show_unknown_message(f"task \"{command[0]}\"")
+            show_error_message(f"Unknown task \"{command[0]}\"")
 
-def show_unknown_message(unknown_thing):
-    comm.chat_message.emit(f"<Server> Error: Unknown {unknown_thing}")
+def show_error_message(error):
+    comm.chat_message.emit(f"<Server> {error}")
+
 
 def show_no_info_from_server():
     comm.chat_message.emit("<INFO> No info received from server, try again later.")
+
 
 def test_input(text_array):
     """
@@ -207,10 +214,10 @@ def test_input(text_array):
     :return: 1 if ok, 0 if not ok
     """
     if not text_array[-1].isnumeric():
-        comm.chat_message.emit("<Server> You must provide a number of words.")
+        show_error_message("You must provide a number of words.")
         return 0
     if int(text_array[-1]) < 1 or int(text_array[-1]) > 10000:
-        comm.chat_message.emit("<Server> Number must be 1<x<10000.")
+        show_error_message("Number must be 1<x<10000.")
         return 0
 
     send_server_message(f"task {' '.join(text_array)}")
@@ -387,12 +394,7 @@ def hash_command_hash(command):
             show_no_info_from_server()
             return
 
-
-    hash = hashlib.sha256(_decode_message(message_to_hash).encode())
-    print(message_to_hash)
-    print(hash.hexdigest())
-
-    send_server_message(hash.hexdigest())
+    send_server_message(hashlib.sha256(_decode_message(message_to_hash).encode()).hexdigest())
 
 #endregion
 # ======================================================================================================================

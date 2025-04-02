@@ -1,3 +1,4 @@
+import math
 import threading
 from PyQt6.QtWidgets import QApplication, QMainWindow
 from PyQt6.QtCore import Qt
@@ -89,6 +90,7 @@ class ChatWindow(QMainWindow):
             else : command = self.rd_btn_decode.text()
 
             if encoding == "hash": msg = f"/task {encoding} {command}"
+            elif encoding == "DifHel": msg = f"/task {encoding}"
             else: msg = f"/task {encoding} {command} {size}"
 
             server_interaction.send_message(msg)
@@ -99,16 +101,20 @@ class ChatWindow(QMainWindow):
     def _change_encoding_values(self):
         match self.listWidget_type.currentItem().text():
             case "hash":
+                # Enable/Disable radio buttons and size selector
                 self.rd_btn_encode.setEnabled(True)
                 self.rd_btn_decode.setEnabled(True)
+                self.sl_size.setEnabled(False)
                 self.rd_btn_encode.setText("verify")
                 self.rd_btn_decode.setText("hash")
             case "DifHel":
                 self.rd_btn_encode.setEnabled(False)
                 self.rd_btn_decode.setEnabled(False)
+                self.sl_size.setEnabled(False)
             case _:
                 self.rd_btn_encode.setEnabled(True)
                 self.rd_btn_decode.setEnabled(True)
+                self.sl_size.setEnabled(True)
                 self.rd_btn_encode.setText("encode")
                 self.rd_btn_decode.setText("decode")
 
