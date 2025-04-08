@@ -279,55 +279,6 @@ def difhel(text_array):
     send_server_message(str(k))
     server_messages.clear()
 
-def is_prime(n: int) -> bool:
-    if n <= 3:
-        return n > 1
-    if n % 2 == 0 or n % 3 == 0:
-        return False
-    limit = math.isqrt(n) + 1
-    for i in range(5, limit, 6):
-        if n % i == 0 or n % (i + 2) == 0:
-            return False
-    return True
-
-def get_last_prime(num):
-    curr_num = num - 1
-    while curr_num > 3:
-        if is_prime(curr_num):
-            return curr_num
-        curr_num -= 1
-    return 3
-
-def get_primitive_root(n):
-    g = 1
-    prime_factors = set(get_prime_factors(n - 1)) # pas de doublons
-    ok = False
-    while not ok:
-        g += 1
-        ok = True
-        for pf in prime_factors:
-            if pow(g,(n - 1) // pf,n) == 1:
-                ok = False
-    return g
-
-def get_next_prime(n):
-    num = n + 1
-    while not is_prime(num):
-        num += 1
-    return num
-
-def get_prime_factors(n) -> list[int]:
-    curr_num = n
-    curr_divisor = 2
-    prime_factors = []
-    while curr_num != 1:
-        if curr_num % curr_divisor == 0:
-            curr_num = int(curr_num / curr_divisor)
-            prime_factors.append(curr_divisor)
-        else:
-            curr_divisor = get_next_prime(curr_divisor)
-    return prime_factors
-
 def shift_vigenere_encode(encryption_type, text_array):
 
     """ shift_vigenere
@@ -437,7 +388,114 @@ def shift_vigenere_decode(type, text_array):
     print('shift_vigenere_decode')
 
 def rsa_decode(text_array):
-    pass
+    if test_input(text_array) == 0: return
+
+    global server_messages
+
+    UPPER_LIMIT = 1000
+
+    p = get_next_prime(random.randint(2, UPPER_LIMIT))
+    q = get_next_prime(random.randint(2, UPPER_LIMIT))
+    n = p * q
+    k = (p - 1) * (q - 1)
+    e = get_coprime(k)  # public key
+    d = pow(e, -1, k)  # private key
+
+    server_messages.clear()
+
+    while len(server_messages) != 1:
+        pass
+
+    send_server_message(f"{n},{e}")
+
+    server_messages.clear()
+
+    # Wait for server_message
+    while len(server_messages) != 1:
+        pass
+
+    # After receiving all needed messages
+    message_to_decode = _decode_message(server_messages[0], True)
+
+    message_decoded = b''
+
+    for c in message_to_decode:
+        message_decoded += int_encode(pow(c, d, n), 4)
+    send_server_message_no_encoding(message_decoded)
+    server_messages = []
+
+    time_waited = 0
+    while True:
+        time.sleep(0.5)
+        time_waited += 0.5
+        if len(server_messages) != 0:
+            server_messages = server_messages[1:]
+            break
+
+        if time_waited == 2:
+            comm.chat_message.emit("<INFO> No info received from server, try again later.")
+            return
+
+#endregion
+# ======================================================================================================================
+
+
+# ======================================================================================================================
+#region PRIME
+
+def get_coprime(n) :
+    while True:
+        e = random.randint(2, n - 1)
+        if math.gcd(e, n) == 1: return e
+
+def is_prime(n: int) -> bool:
+    if n <= 3:
+        return n > 1
+    if n % 2 == 0 or n % 3 == 0:
+        return False
+    limit = math.isqrt(n) + 1
+    for i in range(5, limit, 6):
+        if n % i == 0 or n % (i + 2) == 0:
+            return False
+    return True
+
+def get_last_prime(num):
+    curr_num = num - 1
+    while curr_num > 3:
+        if is_prime(curr_num):
+            return curr_num
+        curr_num -= 1
+    return 3
+
+def get_primitive_root(n):
+    g = 1
+    prime_factors = set(get_prime_factors(n - 1)) # pas de doublons
+    ok = False
+    while not ok:
+        g += 1
+        ok = True
+        for pf in prime_factors:
+            if pow(g,(n - 1) // pf,n) == 1:
+                ok = False
+    return g
+
+def get_next_prime(n):
+    num = n + 1
+    while not is_prime(num):
+        num += 1
+    return num
+
+def get_prime_factors(n) -> list[int]:
+    curr_num = n
+    curr_divisor = 2
+    prime_factors = []
+    while curr_num != 1:
+        if curr_num % curr_divisor == 0:
+            curr_num = int(curr_num / curr_divisor)
+            prime_factors.append(curr_divisor)
+        else:
+            curr_divisor = get_next_prime(curr_divisor)
+    return prime_factors
 
 #endregion
 # ======================================================================================================================
