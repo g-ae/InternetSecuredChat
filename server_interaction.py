@@ -204,10 +204,8 @@ def server_task_command(text):
 def show_error_message(error):
     comm.chat_message.emit(f"<Server> {error}")
 
-
 def show_no_info_from_server():
     comm.chat_message.emit("<INFO> No info received from server, try again later.")
-
 
 def test_input(text_array):
     """
@@ -232,49 +230,67 @@ def test_input(text_array):
 # ======================================================================================================================
 #region ENCODING
 
+def wait_server_messages(number_of_messages, max_time = 2) -> bool:
+    server_messages.clear()
+    return wait_server_messages_no_empty(number_of_messages, max_time)
+
+def wait_server_messages_no_empty(number_of_messages, max_time = 2) -> bool:
+    """
+    Waits for max "max_time" seconds for "number_of_messages" messages from server
+    Server message list is not emptied !
+    :param number_of_messages:
+    :param max_time:
+    :return: True if got all, False if max time exceeded
+    """
+    time_waited = 0
+    while len(server_messages) != number_of_messages:
+        time.sleep(0.1)
+        time_waited += 0.1
+        if time_waited >= max_time:
+            show_no_info_from_server()
+            return False
+    return True
+
 def difhel(text_array):
     server_messages.clear()
-
     send_server_message("task " + ' '.join(text_array))
 
+    # Wait for 1 server message, if nothing received, return
+    if not wait_server_messages(1):
+        return
+
+    # Generate prime number p and generator
     p = get_last_prime(random.randint(2, 4999))
     g = get_primitive_root(p)
 
-    # Attendre message du serveur pour faire tout bien tout beau
-    while len(server_messages) != 1:
-        pass
-
-    server_messages.clear()
-
     send_server_message(f"{p},{g}")
 
-    # Voir si c'est bon ce qu'on a envoyé, si oui, continuer
-    while len(server_messages) != 1:
-        pass
+    # Wait for 1 server message, if nothing received, return
+    if not wait_server_messages(1):
+        return
 
-    # Received one message
+    # Check if prime number and generator we sent is correct, if not, print error (shouldn't happen)
     if not _decode_message(server_messages[0]).__contains__("accepted"):
         print("Error, try again")
         server_messages.clear()
         return
 
-    # Go on
-    # Wait for second server message (with his half-key)
-    while len(server_messages) != 2:
-        pass
+    # P and G are correct
+    # Wait for second server message (with their half-key)
+    # Without emptying server_messages list because the message we need may already have been received
+    if not wait_server_messages_no_empty(2):
+        return
 
     server_half_key = int(_decode_message(server_messages[1]))
-
-    server_messages.clear()
-
     my_secret_key = random.randint(1,5000)
     my_half_key = pow(g,my_secret_key,p) #g^a mod p
 
+    server_messages.clear()
     send_server_message(str(my_half_key))
 
     # Wait for server message awaiting shared secret for validation
-    while len(server_messages) != 1:
-        pass
+    if not wait_server_messages(1):
+        return
 
     k = pow(server_half_key, my_secret_key, p) # B^a mod p
 
@@ -330,33 +346,22 @@ def get_prime_factors(n) -> list[int]:
             curr_divisor = get_next_prime(curr_divisor)
     return prime_factors
 
-def shift_vigenere_encode(encryption_type, text_array):
+def shift_vigenere_encode(encryption_type: str, text_array: list[str]):
 
     """ shift_vigenere
-        :param encryption_type: string - shift, vigenere
-        :param text_array: array[string] - message
+        :param encryption_type: str: shift, vigenere
+        :param text_array: list[str] - message
         This function encode the message and send them
     """
 
     if test_input(text_array) == 0: return
 
-    global server_messages
+    if not wait_server_messages(2):
+        return
 
-    key = ''
-    message_to_decode = ''
-    time_waited = 0
-
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) == 2:
-            message = _decode_message(server_messages[0])
-            key = message.split(' ')[-1]
-            message_to_decode = _decode_message(server_messages[1], True)
-            break
-        if time_waited == 2:
-            comm.chat_message.emit("<INFO> No info received from server, try again later.")
-            return
+    message = _decode_message(server_messages[0])
+    key = message.split(' ')[-1]
+    message_to_decode = _decode_message(server_messages[1], True)
 
     message_decoded = b''
 
@@ -372,61 +377,31 @@ def shift_vigenere_encode(encryption_type, text_array):
 
     send_server_message_no_encoding(message_decoded)
 
-    server_messages = []
-
-    time_waited = 0
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) != 0:
-            server_messages = server_messages[1:]
-            break
-
-        if time_waited == 2:
-            comm.chat_message.emit("<INFO> No info received from server, try again later.")
-            return
+    # Wait for reception of message confirming that everything is good
+    wait_server_messages(1)
 
 def rsa_encode(text_array):
     if test_input(text_array) == 0: return
 
     global server_messages
 
-    message_to_decode = ''
-    time_waited = 0
-    n = 0
-    e = 0
+    if not wait_server_messages(2):
+        return
 
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) == 2:
-            message = _decode_message(server_messages[0])
-            x = re.findall("[0-9]+", message) # /\d+/ works as well but shows a warning on the console
-            n = int(x[0])
-            e = int(x[1])
-            message_to_decode = _decode_message(server_messages[1], True)
-            break
-        if time_waited == 2:
-            comm.chat_message.emit("<INFO> No info received from server, try again later.")
-            return
+    message = _decode_message(server_messages[0])
+    x = re.findall("[0-9]+", message) # /\d+/ works as well but shows a warning on the console
+    n = int(x[0])
+    e = int(x[1])
+    message_to_decode = _decode_message(server_messages[1], True)
 
     message_decoded = b''
+
     for c in message_to_decode:
         message_decoded += int_encode(pow(c, e, n), 4)
     send_server_message_no_encoding(message_decoded)
-    server_messages = []
 
-    time_waited = 0
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) != 0:
-            server_messages = server_messages[1:]
-            break
-
-        if time_waited == 2:
-            comm.chat_message.emit("<INFO> No info received from server, try again later.")
-            return
+    # Wait for reception of message confirming that everything is good
+    wait_server_messages(1)
 
 #endregion
 # ======================================================================================================================
@@ -449,52 +424,29 @@ def rsa_decode(text_array):
 #region HASHING
 
 def hash_command_verify(command):
-    global server_messages
-
-    message_to_hash = ''
-    hashed = ''
-    time_waited = 0
-
-    server_messages = []
-
     send_server_message(f"task {' '.join(command)}")
 
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) == 3:
-            message_to_hash = server_messages[1]
-            hashed = server_messages[2]
+    if not wait_server_messages(3):
+        return
 
-            server_messages = []
-            break
-        if time_waited == 3:
-            show_no_info_from_server()
-            return
-
+    message_to_hash = server_messages[1]
+    hashed = server_messages[2]
 
     send_server_message(str(hashlib.sha256(message_to_hash) == hashed).lower())
 
+    wait_server_messages(1)
+
 def hash_command_hash(command):
-    global server_messages
-    server_messages = []
-
-    time_waited = 0
-
     send_server_message(f"task {' '.join(command)}")
 
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) == 2:
-            message_to_hash = server_messages[1]
-            server_messages = []
-            break
-        if time_waited == 3:
-            show_no_info_from_server()
-            return
+    if not wait_server_messages(2):
+        return
+
+    message_to_hash = server_messages[1]
 
     send_server_message(hashlib.sha256(_decode_message(message_to_hash).encode()).hexdigest())
+
+    wait_server_messages(1)
 
 #endregion
 # ======================================================================================================================
