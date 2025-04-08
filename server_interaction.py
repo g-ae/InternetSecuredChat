@@ -134,7 +134,7 @@ def send_message(text):
     global last_own_sent_message
     if text.startswith("/"):
         threading.Thread(target=server_task_command, args=[text[1:]]).start()
-    elif not len(text) == 0 and text != last_own_sent_message:
+    elif not len(text) == 0:
         connection.send(_str_encode('t', text))
         comm.chat_message.emit("<You> " + text)
         last_own_sent_message = text
@@ -202,10 +202,8 @@ def server_task_command(text):
 def show_error_message(error):
     comm.chat_message.emit(f"<Server> {error}")
 
-
 def show_no_info_from_server():
     comm.chat_message.emit("<INFO> No info received from server, try again later.")
-
 
 def test_input(text_array):
     """
@@ -339,7 +337,7 @@ def shift_vigenere_decode(type, text_array):
     print('shift_vigenere_decode')
 
 def rsa_decode(text_array):
-    print('rsa_decode')
+    pass
 
 #endregion
 # ======================================================================================================================
