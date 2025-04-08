@@ -1,3 +1,5 @@
+import math
+import random
 import threading, time, re, socket, hashlib
 import window_interaction
 from signals import comm
@@ -194,7 +196,7 @@ def server_task_command(text):
             else:
                 show_error_message(f"Unknown command \"{command[1]}\"")
         case "DifHel":
-            send_server_message("task " + ' '.join(command))
+            difhel(command)
             pass
         case _:
             show_error_message(f"Unknown task \"{command[0]}\"")
@@ -229,6 +231,104 @@ def test_input(text_array):
 
 # ======================================================================================================================
 #region ENCODING
+
+def difhel(text_array):
+    server_messages.clear()
+
+    send_server_message("task " + ' '.join(text_array))
+
+    p = get_last_prime(random.randint(2, 4999))
+    g = get_primitive_root(p)
+
+    # Attendre message du serveur pour faire tout bien tout beau
+    while len(server_messages) != 1:
+        pass
+
+    server_messages.clear()
+
+    send_server_message(f"{p},{g}")
+
+    # Voir si c'est bon ce qu'on a envoyé, si oui, continuer
+    while len(server_messages) != 1:
+        pass
+
+    # Received one message
+    if not _decode_message(server_messages[0]).__contains__("accepted"):
+        print("Error, try again")
+        server_messages.clear()
+        return
+
+    # Go on
+    # Wait for second server message (with his half-key)
+    while len(server_messages) != 2:
+        pass
+
+    server_half_key = int(_decode_message(server_messages[1]))
+
+    server_messages.clear()
+
+    my_secret_key = random.randint(1,5000)
+    my_half_key = pow(g,my_secret_key,p) #g^a mod p
+
+    send_server_message(str(my_half_key))
+
+    # Wait for server message awaiting shared secret for validation
+    while len(server_messages) != 1:
+        pass
+
+    k = pow(server_half_key, my_secret_key, p) # B^a mod p
+
+    send_server_message(str(k))
+    server_messages.clear()
+
+def is_prime(n: int) -> bool:
+    if n <= 3:
+        return n > 1
+    if n % 2 == 0 or n % 3 == 0:
+        return False
+    limit = math.isqrt(n) + 1
+    for i in range(5, limit, 6):
+        if n % i == 0 or n % (i + 2) == 0:
+            return False
+    return True
+
+def get_last_prime(num):
+    curr_num = num - 1
+    while curr_num > 3:
+        if is_prime(curr_num):
+            return curr_num
+        curr_num -= 1
+    return 3
+
+def get_primitive_root(n):
+    g = 1
+    prime_factors = set(get_prime_factors(n - 1)) # pas de doublons
+    ok = False
+    while not ok:
+        g += 1
+        ok = True
+        for pf in prime_factors:
+            if pow(g,(n - 1) // pf,n) == 1:
+                ok = False
+    return g
+
+def get_next_prime(n):
+    num = n + 1
+    while not is_prime(num):
+        num += 1
+    return num
+
+def get_prime_factors(n) -> list[int]:
+    curr_num = n
+    curr_divisor = 2
+    prime_factors = []
+    while curr_num != 1:
+        if curr_num % curr_divisor == 0:
+            curr_num = int(curr_num / curr_divisor)
+            prime_factors.append(curr_divisor)
+        else:
+            curr_divisor = get_next_prime(curr_divisor)
+    return prime_factors
 
 def shift_vigenere_encode(encryption_type, text_array):
 
