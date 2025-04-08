@@ -12,6 +12,7 @@ class ChatWindow(QMainWindow):
         uic.loadUi("ui/InternetSecuredChat_V1.ui", self)
         self._setup_ui()
         self._connect_signals()
+        self._connect_to_server()
 
     def _setup_ui(self):
         # Disable focus on chat zone
@@ -120,8 +121,8 @@ class ChatWindow(QMainWindow):
 
 app = QApplication([])
 window = ChatWindow()
-host = ""
-port = 0
+host = "vlbelintrocrypto.hevs.ch"
+port = 6000
 
 def load_window():
     window.show()
