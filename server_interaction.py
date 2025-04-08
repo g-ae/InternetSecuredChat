@@ -377,18 +377,14 @@ def rsa_decode(text_array):
     e = get_coprime(k)  # public key
     d = pow(e, -1, k)  # private key
 
-    server_messages.clear()
-
-    while len(server_messages) != 1:
-        pass
+    if not wait_server_messages(1):
+        return
 
     send_server_message(f"{n},{e}")
 
-    server_messages.clear()
-
     # Wait for server_message
-    while len(server_messages) != 1:
-        pass
+    if not wait_server_messages(1):
+        return
 
     # After receiving all needed messages
     message_to_decode = _decode_message(server_messages[0], True)
@@ -398,19 +394,8 @@ def rsa_decode(text_array):
     for c in message_to_decode:
         message_decoded += int_encode(pow(c, d, n), 4)
     send_server_message_no_encoding(message_decoded)
-    server_messages = []
 
-    time_waited = 0
-    while True:
-        time.sleep(0.5)
-        time_waited += 0.5
-        if len(server_messages) != 0:
-            server_messages = server_messages[1:]
-            break
-
-        if time_waited == 2:
-            comm.chat_message.emit("<INFO> No info received from server, try again later.")
-            return
+    wait_server_messages(1)
 
 #endregion
 # ======================================================================================================================
