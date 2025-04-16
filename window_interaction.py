@@ -1,4 +1,3 @@
-import math
 import threading
 from PyQt6.QtWidgets import QApplication, QMainWindow
 from PyQt6.QtCore import Qt
@@ -118,6 +117,9 @@ class ChatWindow(QMainWindow):
                 self.sl_size.setEnabled(True)
                 self.rd_btn_encode.setText("encode")
                 self.rd_btn_decode.setText("decode")
+
+    def _get_encoding_values(self):
+        return (self.listWidget_type.currentItem().text(), self.sl_size.value())
 
 app = QApplication([])
 window = ChatWindow()
