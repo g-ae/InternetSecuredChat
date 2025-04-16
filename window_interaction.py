@@ -36,6 +36,7 @@ class ChatWindow(QMainWindow):
 
         # Plain Text
         comm.chat_message.connect(self._add_message)
+        comm.decoded_message.connect(self._add_decoded)
 
     def _update_size_label(self, value):
         self.lbl_10.setText(str(value))
@@ -98,6 +99,9 @@ class ChatWindow(QMainWindow):
     def _add_message(self, text):
         self.plainTextEdit_chat.appendPlainText(text)
 
+    def _add_decoded(self, text):
+        self.plainTextEdit_decoded.appendPlainText(text)
+
     def _change_encoding_values(self):
         match self.listWidget_type.currentItem().text():
             case "hash":
@@ -120,6 +124,10 @@ class ChatWindow(QMainWindow):
 
     def _get_encoding_values(self):
         return (self.listWidget_type.currentItem().text(), self.sl_size.value())
+
+    def _clear_chat(self):
+        self.plainTextEdit_chat.clear()
+        self.plainTextEdit_decoded.clear()
 
 app = QApplication([])
 window = ChatWindow()

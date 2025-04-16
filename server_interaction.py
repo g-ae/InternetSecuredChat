@@ -107,6 +107,7 @@ def handle_message_reception():
                     continue
 
                 data = connection.recv(int.from_bytes(size, "big") * 4)
+                saved_message.append(data)
             except (ConnectionAbortedError, OSError):
                 exit(1)
 
@@ -115,7 +116,6 @@ def handle_message_reception():
             if data != b'':
                 if message_type == ord('s'):
                     server_messages.append(data)
-                    saved_message.append(data)
                     comm.chat_message.emit("<Server> " + decoded_data)
                 else:
                     global last_own_sent_message
@@ -135,6 +135,8 @@ def send_message(text):
                 send_crypted_server_message(text[1:])
             case x if x.startswith("/decrypt"):
                 show_decrypted_server_message(text[1:])
+            case x if x.startswith("/clear") :
+                window_interaction.window._clear_chat()
             case _:
                 show_error_message(f"Unknown command \"{text.split(' ')[0]}\"")
                 return
@@ -182,7 +184,6 @@ def send_crypted_server_message(text):
             case _:
                 show_error_message(f" {type} is not a valide encoding")
 
-        saved_message.append(message_crypted)
         send_message(_decode_message(message_crypted))
 
     except :
@@ -221,7 +222,7 @@ def show_decrypted_server_message(text) :
             case _:
                 show_error_message(f" {type} is not a valide encoding")
 
-        send_message(_decode_message(message_decrypted))
+        comm.decoded_message.emit(_decode_message(message_decrypted))
 
     except:
         show_error_message(f"Invalid arguments, try again")
