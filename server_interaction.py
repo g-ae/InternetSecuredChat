@@ -103,7 +103,7 @@ def handle_message_reception():
                 if message_type == ord('i'):
                     print("Received image request")
                     # 128 * 128 bytes or * 3 ?
-                    connection.recv(size[0] * size[1])
+                    connection.recv(size[0] * size[1] * 3)
                     continue
 
                 data = connection.recv(int.from_bytes(size, "big") * 4)
@@ -313,12 +313,12 @@ def wait_server_messages_no_empty(number_of_messages, max_time = 2) -> bool:
     :return: True if got all, False if max time exceeded
     """
     time_waited = 0
-    while len(server_messages) != number_of_messages:
-        time.sleep(0.1)
+    while len(server_messages) < number_of_messages:
         time_waited += 0.1
         if time_waited >= max_time:
             show_no_info_from_server()
             return False
+        time.sleep(0.1)
     return True
 
 def difhel(text_array):
@@ -326,17 +326,19 @@ def difhel(text_array):
     send_server_message("task " + ' '.join(text_array))
 
     # Wait for 1 server message, if nothing received, return
-    if not wait_server_messages(1):
+    if not wait_server_messages_no_empty(1):
         return
 
     # Generate prime number p and generator
     p = get_last_prime(random.randint(2, 4999))
     g = get_primitive_root(p)
 
+    server_messages.clear()
+
     send_server_message(f"{p},{g}")
 
-    # Wait for 1 server message, if nothing received, return
-    if not wait_server_messages(1):
+    # Wait for 2 server messages, if nothing received, return
+    if not wait_server_messages_no_empty(2):
         return
 
     # Check if prime number and generator we sent is correct, if not, print error (shouldn't happen)
@@ -527,17 +529,20 @@ def get_prime_factors(n) -> list[int]:
 #region HASHING
 
 def hash_command_verify(command):
+    server_messages.clear()
     send_server_message(f"task {' '.join(command)}")
 
-    if not wait_server_messages(3):
+    if not wait_server_messages_no_empty(3):
         return
 
     message_to_hash = server_messages[1]
     hashed = server_messages[2]
 
+    server_messages.clear()
+
     send_server_message(str(hashlib.sha256(message_to_hash) == hashed).lower())
 
-    wait_server_messages(1)
+    wait_server_messages_no_empty(1)
 
 def hash_command_hash(command):
     send_server_message(f"task {' '.join(command)}")
