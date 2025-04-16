@@ -8,11 +8,9 @@ stop_event = threading.Event()
 connection: socket.socket = None  # type socket so that there are no errors in the rest of the code
 connection_state = -1  # -1 not connected yet, 0 connection failed, 1 connected
 last_own_sent_message = ""
-
 server_messages = []
+saved_message = []
 
-
-# ======================================================================================================================
 #region ALL
 
 def single_char_encode(chr):
@@ -46,10 +44,7 @@ def _decode_message(text, from_server = False):
     return result.replace("\x00", "")
 
 #endregion
-# ======================================================================================================================
 
-
-# ======================================================================================================================
 #region CONNECTION
 
 def open_connection():
@@ -89,10 +84,7 @@ def close_connection():
     print("[CONNECTION] Closed")
 
 #endregion
-# ======================================================================================================================
 
-
-# ======================================================================================================================
 #region MESSAGES
 
 def handle_message_reception():
@@ -123,6 +115,7 @@ def handle_message_reception():
             if data != b'':
                 if message_type == ord('s'):
                     server_messages.append(data)
+                    saved_message.append(data)
                     comm.chat_message.emit("<Server> " + decoded_data)
                 else:
                     global last_own_sent_message
@@ -135,7 +128,16 @@ def handle_message_reception():
 def send_message(text):
     global last_own_sent_message
     if text.startswith("/"):
-        threading.Thread(target=server_task_command, args=[text[1:]]).start()
+        match text:
+            case x if x.startswith("/task"):
+                threading.Thread(target=server_task_command, args=[text[1:]]).start()
+            case x if x.startswith("/crypt"):
+                send_crypted_server_message(text[1:])
+            case x if x.startswith("/decrypt"):
+                show_decrypted_server_message(text[1:])
+            case _:
+                show_error_message(f"Unknown command \"{text.split(' ')[0]}\"")
+                return
     elif not len(text) == 0:
         connection.send(_str_encode('t', text))
         comm.chat_message.emit("<You> " + text)
@@ -145,15 +147,91 @@ def send_server_message(text):
     comm.chat_message.emit("<You to Server> " + text)
     connection.send(_str_encode('s', text))
 
+def send_crypted_server_message(text):
+    command = text.split(' ')
+    del command[0]  # Remove "crypt" from command
+
+    # Test there's another word than "crypt"
+    if len(command) == 0:
+        show_error_message("More arguments needed")
+        return
+
+    type = window_interaction.window._get_encoding_values()[0]
+
+    try :
+        msg = b''
+        for s in command[0]: msg += single_char_encode(s)
+
+        message_crypted = b''
+        message_to_crypt = _decode_message(msg, True)
+        key = command[1]
+
+        match type:
+            case "shift":
+                for i in message_to_crypt:
+                    message_crypted += int_encode(i + int(key), 4)
+            case "vigenere":
+                for i, c in enumerate(message_to_crypt):
+                    intKey = int.from_bytes(key[i % len(key)].encode())
+                    message_crypted += int_encode(c + intKey, 4)
+            case "RSA":
+                n = int(command[1])
+                e = int(command[2])
+                for c in message_to_crypt:
+                    message_crypted += int_encode(pow(c, e, n), 4)
+            case _:
+                show_error_message(f" {type} is not a valide encoding")
+
+        saved_message.append(message_crypted)
+        send_message(_decode_message(message_crypted))
+
+    except :
+        show_error_message(f"Invalid arguments, try again")
+
+def show_decrypted_server_message(text) :
+    command = text.split(' ')
+    del command[0]  # Remove "decrypt" from command
+
+    # Test there's another word than "decrypt"
+    if len(command) == 0:
+        show_error_message("More arguments needed")
+        return
+
+    type = window_interaction.window._get_encoding_values()[0]
+
+    try:
+        message_decrypted = b''
+        message_num = int(command[0])
+        message_to_decrypt = _decode_message(saved_message[-message_num], True)
+        key = command[1]
+
+        match type:
+            case "shift":
+                for i in message_to_decrypt:
+                    message_decrypted += int_encode(i - int(key), 4)
+            case "vigenere":
+                for i, c in enumerate(message_to_decrypt):
+                    intKey = int.from_bytes(key[i % len(key)].encode())
+                    message_decrypted += int_encode(c - intKey, 4)
+            case "RSA":
+                n = int(command[1])
+                d = int(command[2])
+                for c in message_to_decrypt:
+                    message_decrypted += int_encode(pow(c, d, n), 4)
+            case _:
+                show_error_message(f" {type} is not a valide encoding")
+
+        send_message(_decode_message(message_decrypted))
+
+    except:
+        show_error_message(f"Invalid arguments, try again")
+
 def send_server_message_no_encoding(bytes):
     comm.chat_message.emit("<You to Server> " + _decode_message(bytes))
     connection.send(b'ISCs' + int_encode(int(len(bytes) / 4), 2)  + bytes)
 
 #endregion
-# ======================================================================================================================
 
-
-# ======================================================================================================================
 #region TASKS
 
 def server_task_command(text):
@@ -162,13 +240,7 @@ def server_task_command(text):
     # task hash verify
 
     command = text.split(' ')
-    if command[0] != "task":
-        show_error_message(f"Unknown command \"{command[0]}\"")
-        return
-
-
-    # Remove "task" from command
-    del command[0]
+    del command[0] # Remove "task" from command
 
     # Test there's another word than "task"
     if len(command) == 0:
@@ -224,10 +296,7 @@ def test_input(text_array):
     return 1
 
 #endregion
-# ======================================================================================================================
 
-
-# ======================================================================================================================
 #region ENCODING
 
 def wait_server_messages(number_of_messages, max_time = 2) -> bool:
@@ -356,10 +425,7 @@ def rsa_encode(text_array):
     wait_server_messages(1)
 
 #endregion
-# ======================================================================================================================
 
-
-# ======================================================================================================================
 #region DECODING
 
 def shift_vigenere_decode(type, text_array):
@@ -400,10 +466,7 @@ def rsa_decode(text_array):
     wait_server_messages(1)
 
 #endregion
-# ======================================================================================================================
 
-
-# ======================================================================================================================
 #region PRIME
 
 def get_coprime(n) :
@@ -461,10 +524,7 @@ def get_prime_factors(n) -> list[int]:
     return prime_factors
 
 #endregion
-# ======================================================================================================================
 
-
-# ======================================================================================================================
 #region HASHING
 
 def hash_command_verify(command):
@@ -496,4 +556,3 @@ def hash_command_hash(command):
     wait_server_messages(1)
 
 #endregion
-# ======================================================================================================================
