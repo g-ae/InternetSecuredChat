@@ -4,50 +4,99 @@ import threading, time, re, socket, hashlib
 import window_interaction
 from signals import comm
 
-stop_event = threading.Event()
-connection: socket.socket = None  # type socket so that there are no errors in the rest of the code
-connection_state = -1  # -1 not connected yet, 0 connection failed, 1 connected
-last_own_sent_message = ""
-server_messages = []
-saved_message = []
+# Global variables for connection management
+stop_event = threading.Event()  # Event to signal thread termination
+connection: socket.socket = None  # Socket connection to server
+connection_state = -1  # Connection states: -1 (not connected), 0 (failed), 1 (connected)
+last_own_sent_message = ""  # Store last message to prevent duplicates
+server_messages = []  # Store messages received from server
+saved_message = []  # Archive received messages for later use
 
-#region ALL
+# region Message Encoding/Decoding Utilities
 
 def single_char_encode(chr):
+    """
+    Encode a single character to UTF-8 with padding.
+
+    Args:
+        chr (str): Single character to encode
+
+    Returns:
+        bytes: Encoded character with padding to 4 bytes
+    """
+
     encoded = chr.encode('utf-8')
     return (4 - len(encoded)) * b'\x00' + encoded
 
 def int_encode(int, bytenum):
+    """
+    Encode an integer to bytes with specified length.
+
+    Args:
+        int (int): Integer to encode
+        bytenum (int): Number of bytes to use
+
+    Returns:
+        bytes: Encoded integer in big-endian format
+    """
+
     return int.to_bytes(bytenum, byteorder='big')
 
 def _str_encode(type, string):
+    """
+    Encode a string message using the ISC protocol format.
+
+    Args:
+        type (str): Message type identifier
+        string (str): Message content to encode
+
+    Returns:
+        bytes: Complete encoded message
+    """
+
     # ISC Header + type of message + string length encoded in big-endian
     msg = b'ISC' + type.encode('utf-8') + int_encode(len(string), 2)
 
-    # Encode char as unicode (up to 4 chars) -> if is only one, 3 times \x00 then 1 time ascii of char \x97
+    # Encode each character as unicode (up to 4 bytes per char)
     for s in string:
         msg += single_char_encode(s)
 
     return msg
 
-def _decode_message(text, from_server = False):
+def _decode_message(text, from_server=False):
+    """
+    Decode a message from bytes to string/integers.
+
+    Args:
+        text (bytes): Encoded message
+        from_server (bool, optional): If True, return integer values instead of string. Defaults to False.
+
+    Returns:
+        str/list: Decoded string or list of integer values
+    """
+
     result = ''
     int_data = []
     for i in range(0, len(text), 4):
         int_data.append(int.from_bytes(text[i:i + 4], "big"))
-        try :
+        try:
             result += text[i:i + 4].decode("utf-8")
-        except :
+        except:
             result += '*'
 
     if from_server: return int_data
     return result.replace("\x00", "")
 
-#endregion
+# endregion
 
-#region CONNECTION
+# region Connection Management
 
 def open_connection():
+    """
+    Establish a connection to the server.
+    Updates global connection state and starts message reception thread.
+    """
+
     global connection_state, connection
     connection_state = -1
     try:
@@ -72,6 +121,11 @@ def open_connection():
         close_connection()
 
 def close_connection():
+    """
+    Close the connection to the server.
+    Signals the message reception thread to stop and closes the socket.
+    """
+
     global connection_state
     stop_event.set()
     if connection:  # Check if connection exists
@@ -83,26 +137,30 @@ def close_connection():
     connection_state = -1
     print("[CONNECTION] Closed")
 
-#endregion
+# endregion
 
-#region MESSAGES
+# region Message Handling
 
 def handle_message_reception():
+    """
+    Background thread function to continuously receive and process messages from server.
+    Runs until stop_event is set.
+    """
     try:
-        while not stop_event.is_set():  # Tant qu'on ne demande pas d'arrêt
+        while not stop_event.is_set():  # Continue until stop is requested
             try:
                 firstdata = connection.recv(6)
                 if firstdata == b'':
-                    # NO DATA
+                    # No data received
                     continue
 
                 message_type = firstdata[3]
                 size = firstdata[-2:]
 
-                # TODO : Test handling of image reception
+                # Handle image data (not fully implemented)
                 if message_type == ord('i'):
                     print("Received image request")
-                    # 128 * 128 bytes or * 3 ?
+                    # Read image data (128x128x3 bytes)
                     connection.recv(size[0] * size[1] * 3)
                     continue
 
@@ -126,6 +184,13 @@ def handle_message_reception():
         pass
 
 def send_message(text):
+    """
+    Send a message to the server.
+    Handles special commands prefixed with '/' or sends as regular message.
+
+    Args:
+        text (str): Message text to send
+    """
     global last_own_sent_message
     if text.startswith("/"):
         match text:
@@ -135,7 +200,7 @@ def send_message(text):
                 send_crypted_server_message(text[1:])
             case x if x.startswith("/decrypt"):
                 show_decrypted_server_message(text[1:])
-            case x if x.startswith("/clear") :
+            case x if x.startswith("/clear"):
                 window_interaction.window._clear_chat()
             case _:
                 show_error_message(f"Unknown command \"{text.split(' ')[0]}\"")
@@ -146,21 +211,33 @@ def send_message(text):
         last_own_sent_message = text
 
 def send_server_message(text):
+    """
+    Send a message directly to the server.
+
+    Args:
+        text (str): Message text to send to server
+    """
     comm.chat_message.emit("<You to Server> " + text)
     connection.send(_str_encode('s', text))
 
 def send_crypted_server_message(text):
+    """
+    Encrypt and send a message to the server.
+
+    Args:
+        text (str): Command and message to encrypt
+    """
     command = text.split(' ')
     del command[0]  # Remove "crypt" from command
 
-    # Test there's another word than "crypt"
+    # Check for additional arguments
     if len(command) == 0:
         show_error_message("More arguments needed")
         return
 
     type = window_interaction.window._get_encoding_values()[0]
 
-    try :
+    try:
         msg = b''
         for s in command[0]: msg += single_char_encode(s)
 
@@ -186,14 +263,20 @@ def send_crypted_server_message(text):
 
         send_message(_decode_message(message_crypted))
 
-    except :
+    except:
         show_error_message(f"Invalid arguments, try again")
 
-def show_decrypted_server_message(text) :
+def show_decrypted_server_message(text):
+    """
+    Decrypt and display a previously received message.
+
+    Args:
+        text (str): Command with index of message to decrypt and key
+    """
     command = text.split(' ')
     del command[0]  # Remove "decrypt" from command
 
-    # Test there's another word than "decrypt"
+    # Check for additional arguments
     if len(command) == 0:
         show_error_message("More arguments needed")
         return
@@ -228,28 +311,38 @@ def show_decrypted_server_message(text) :
         show_error_message(f"Invalid arguments, try again")
 
 def send_server_message_no_encoding(bytes):
+    """
+    Send raw bytes to the server without encoding.
+    For use with pre-encoded messages.
+
+    Args:
+        bytes (bytes): Pre-encoded message data
+    """
     comm.chat_message.emit("<You to Server> " + _decode_message(bytes))
-    connection.send(b'ISCs' + int_encode(int(len(bytes) / 4), 2)  + bytes)
+    connection.send(b'ISCs' + int_encode(int(len(bytes) / 4), 2) + bytes)
 
-#endregion
+# endregion
 
-#region TASKS
+# region Task Command Processing
 
 def server_task_command(text):
-    # command example:
-    # task shift encode 10
-    # task hash verify
+    """
+    Process task commands for cryptographic operations.
+    Parses the command and delegates to appropriate handler functions.
 
+    Args:
+        text (str): Task command string (e.g., "task shift encode 10")
+    """
+    # Parse the command
     command = text.split(' ')
-    del command[0] # Remove "task" from command
+    del command[0]  # Remove "task" from command
 
-    # Test there's another word than "task"
+    # Check for additional arguments
     if len(command) == 0:
         show_error_message("More arguments needed")
         return
 
-    # command[1] gives "encode"/"decode" or "verify"/"hash"
-
+    # Dispatch to appropriate handler based on encryption type
     match (command[0]):
         case "shift" | "vigenere":
             if command[1] == "encode":
@@ -270,21 +363,33 @@ def server_task_command(text):
                 show_error_message(f"Unknown command \"{command[1]}\"")
         case "DifHel":
             difhel(command)
-            pass
         case _:
             show_error_message(f"Unknown task \"{command[0]}\"")
 
 def show_error_message(error):
+    """
+    Display an error message in the chat window.
+
+    Args:
+        error (str): Error message to display
+    """
     comm.chat_message.emit(f"<Server> {error}")
 
 def show_no_info_from_server():
+    """
+    Display a message indicating that no response was received from the server.
+    """
     comm.chat_message.emit("<INFO> No info received from server, try again later.")
 
 def test_input(text_array):
     """
-    usage: ``if test_encode_input(text_array) == 0: return``
-    :param text_array:
-    :return: 1 if ok, 0 if not ok
+    Validate task command input parameters.
+
+    Args:
+        text_array (list): Command parameters to validate
+
+    Returns:
+        int: 1 if valid, 0 if invalid
     """
     if not text_array[-1].isnumeric():
         show_error_message("You must provide a number of words.")
@@ -296,21 +401,34 @@ def test_input(text_array):
     send_server_message(f"task {' '.join(text_array)}")
     return 1
 
-#endregion
+# endregion
 
-#region ENCODING
+# region Server Message Waiting Utilities
 
-def wait_server_messages(number_of_messages, max_time = 2) -> bool:
+def wait_server_messages(number_of_messages, max_time=2) -> bool:
+    """
+    Wait for a specified number of server messages, clearing previous messages first.
+
+    Args:
+        number_of_messages (int): Number of messages to wait for
+        max_time (int, optional): Maximum time to wait in seconds. Defaults to 2.
+
+    Returns:
+        bool: True if messages received, False if timeout
+    """
     server_messages.clear()
     return wait_server_messages_no_empty(number_of_messages, max_time)
 
-def wait_server_messages_no_empty(number_of_messages, max_time = 2) -> bool:
+def wait_server_messages_no_empty(number_of_messages, max_time=2) -> bool:
     """
-    Waits for max "max_time" seconds for "number_of_messages" messages from server
-    Server message list is not emptied !
-    :param number_of_messages:
-    :param max_time:
-    :return: True if got all, False if max time exceeded
+    Wait for a specified number of server messages without clearing previous messages.
+
+    Args:
+        number_of_messages (int): Number of messages to wait for
+        max_time (int, optional): Maximum time to wait in seconds. Defaults to 2.
+
+    Returns:
+        bool: True if messages received, False if timeout
     """
     time_waited = 0
     while len(server_messages) < number_of_messages:
@@ -321,15 +439,25 @@ def wait_server_messages_no_empty(number_of_messages, max_time = 2) -> bool:
         time.sleep(0.1)
     return True
 
+# endregion
+
+# region Encryption Implementations
+
 def difhel(text_array):
+    """
+    Implement Diffie-Hellman key exchange protocol with the server.
+
+    Args:
+        text_array (list): Command parameters
+    """
     server_messages.clear()
     send_server_message("task " + ' '.join(text_array))
 
-    # Wait for 1 server message, if nothing received, return
+    # Wait for server response
     if not wait_server_messages_no_empty(1):
         return
 
-    # Generate prime number p and generator
+    # Generate prime number p and generator g
     p = get_last_prime(random.randint(2, 4999))
     g = get_primitive_root(p)
 
@@ -337,45 +465,44 @@ def difhel(text_array):
 
     send_server_message(f"{p},{g}")
 
-    # Wait for 2 server messages, if nothing received, return
+    # Wait for server confirmation
     if not wait_server_messages_no_empty(2):
         return
 
-    # Check if prime number and generator we sent is correct, if not, print error (shouldn't happen)
+    # Check if prime number and generator are accepted
     if not _decode_message(server_messages[0]).__contains__("accepted"):
         print("Error, try again")
         server_messages.clear()
         return
 
-    # P and G are correct
-    # Wait for second server message (with their half-key)
-    # Without emptying server_messages list because the message we need may already have been received
+    # Wait for server's half-key
     if not wait_server_messages_no_empty(2):
         return
 
     server_half_key = int(_decode_message(server_messages[1]))
-    my_secret_key = random.randint(1,5000)
-    my_half_key = pow(g,my_secret_key,p) #g^a mod p
+    my_secret_key = random.randint(1, 5000)
+    my_half_key = pow(g, my_secret_key, p)  # g^a mod p
 
     send_server_message(str(my_half_key))
 
-    # Wait for server message awaiting shared secret for validation
+    # Wait for server to request shared secret
     if not wait_server_messages(1):
         return
 
-    k = pow(server_half_key, my_secret_key, p) # B^a mod p
+    # Calculate shared secret key
+    k = pow(server_half_key, my_secret_key, p)  # B^a mod p
 
     send_server_message(str(k))
     server_messages.clear()
 
 def shift_vigenere_encode(encryption_type: str, text_array: list[str]):
-
-    """ shift_vigenere
-        :param encryption_type: str: shift, vigenere
-        :param text_array: list[str] - message
-        This function encode the message and send them
     """
+    Encode a message using shift cipher or Vigenere cipher.
 
+    Args:
+        encryption_type (str): "shift" or "vigenere"
+        text_array (list[str]): Command parameters
+    """
     if test_input(text_array) == 0: return
 
     if not wait_server_messages(2):
@@ -399,10 +526,16 @@ def shift_vigenere_encode(encryption_type: str, text_array: list[str]):
 
     send_server_message_no_encoding(message_decoded)
 
-    # Wait for reception of message confirming that everything is good
+    # Wait for confirmation
     wait_server_messages(1)
 
 def rsa_encode(text_array):
+    """
+    Encode a message using RSA encryption.
+
+    Args:
+        text_array (list): Command parameters
+    """
     if test_input(text_array) == 0: return
 
     global server_messages
@@ -411,7 +544,7 @@ def rsa_encode(text_array):
         return
 
     message = _decode_message(server_messages[0])
-    x = re.findall("[0-9]+", message) # /\d+/ works as well but shows a warning on the console
+    x = re.findall("[0-9]+", message)  # Extract numbers from message
     n = int(x[0])
     e = int(x[1])
     message_to_decode = _decode_message(server_messages[1], True)
@@ -422,40 +555,55 @@ def rsa_encode(text_array):
         message_decoded += int_encode(pow(c, e, n), 4)
     send_server_message_no_encoding(message_decoded)
 
-    # Wait for reception of message confirming that everything is good
+    # Wait for confirmation
     wait_server_messages(1)
 
-#endregion
+# endregion
 
-#region DECODING
+# region Decoding Implementations
 
 def shift_vigenere_decode(type, text_array):
+    """
+    Decode a message using shift cipher or Vigenere cipher.
+
+    Args:
+        type (str): "shift" or "vigenere"
+        text_array (list): Command parameters
+    """
     print('shift_vigenere_decode')
 
 def rsa_decode(text_array):
+    """
+    Decode a message using RSA decryption.
+    Generates a key pair and decrypts the received message.
+
+    Args:
+        text_array (list): Command parameters
+    """
     if test_input(text_array) == 0: return
 
     global server_messages
 
     UPPER_LIMIT = 1000
 
+    # Generate RSA key pair
     p = get_next_prime(random.randint(2, UPPER_LIMIT))
     q = get_next_prime(random.randint(2, UPPER_LIMIT))
     n = p * q
     k = (p - 1) * (q - 1)
     e = get_coprime(k)  # public key
-    d = pow(e, -1, k)  # private key
+    d = pow(e, -1, k)  # private key (modular multiplicative inverse)
 
     if not wait_server_messages(1):
         return
 
     send_server_message(f"{n},{e}")
 
-    # Wait for server_message
+    # Wait for encoded message
     if not wait_server_messages(1):
         return
 
-    # After receiving all needed messages
+    # Decrypt the message
     message_to_decode = _decode_message(server_messages[0], True)
 
     message_decoded = b''
@@ -466,16 +614,35 @@ def rsa_decode(text_array):
 
     wait_server_messages(1)
 
-#endregion
+# endregion
 
-#region PRIME
+# region Prime Number Utility Functions
 
-def get_coprime(n) :
+def get_coprime(n):
+    """
+    Find a coprime number for n (gcd(e,n) = 1).
+    Used in RSA key generation.
+
+    Args:
+        n (int): Number to find coprime for
+
+    Returns:
+        int: A number coprime to n
+    """
     while True:
         e = random.randint(2, n - 1)
         if math.gcd(e, n) == 1: return e
 
 def is_prime(n: int) -> bool:
+    """
+    Check if a number is prime using trial division with optimizations.
+
+    Args:
+        n (int): Number to check
+
+    Returns:
+        bool: True if prime, False otherwise
+    """
     if n <= 3:
         return n > 1
     if n % 2 == 0 or n % 3 == 0:
@@ -487,6 +654,15 @@ def is_prime(n: int) -> bool:
     return True
 
 def get_last_prime(num):
+    """
+    Find the largest prime number less than or equal to num.
+
+    Args:
+        num (int): Upper limit
+
+    Returns:
+        int: Largest prime <= num
+    """
     curr_num = num - 1
     while curr_num > 3:
         if is_prime(curr_num):
@@ -495,24 +671,52 @@ def get_last_prime(num):
     return 3
 
 def get_primitive_root(n):
+    """
+    Find a primitive root modulo n.
+    Used in Diffie-Hellman key exchange.
+
+    Args:
+        n (int): Modulus (prime number)
+
+    Returns:
+        int: Primitive root of n
+    """
     g = 1
-    prime_factors = set(get_prime_factors(n - 1)) # pas de doublons
+    prime_factors = set(get_prime_factors(n - 1))  # Remove duplicates
     ok = False
     while not ok:
         g += 1
         ok = True
         for pf in prime_factors:
-            if pow(g,(n - 1) // pf,n) == 1:
+            if pow(g, (n - 1) // pf, n) == 1:
                 ok = False
     return g
 
 def get_next_prime(n):
+    """
+    Find the smallest prime number greater than n.
+
+    Args:
+        n (int): Lower limit
+
+    Returns:
+        int: Smallest prime > n
+    """
     num = n + 1
     while not is_prime(num):
         num += 1
     return num
 
 def get_prime_factors(n) -> list[int]:
+    """
+    Factorize a number into its prime factors.
+
+    Args:
+        n (int): Number to factorize
+
+    Returns:
+        list[int]: List of prime factors
+    """
     curr_num = n
     curr_divisor = 2
     prime_factors = []
@@ -524,11 +728,17 @@ def get_prime_factors(n) -> list[int]:
             curr_divisor = get_next_prime(curr_divisor)
     return prime_factors
 
-#endregion
+# endregion
 
-#region HASHING
+# region Hashing Functions
 
 def hash_command_verify(command):
+    """
+    Verify a hash value against a message.
+
+    Args:
+        command (list): Command parameters
+    """
     server_messages.clear()
     send_server_message(f"task {' '.join(command)}")
 
@@ -540,11 +750,18 @@ def hash_command_verify(command):
 
     server_messages.clear()
 
+    # Compare hashes and send result
     send_server_message(str(hashlib.sha256(message_to_hash) == hashed).lower())
 
     wait_server_messages_no_empty(1)
 
 def hash_command_hash(command):
+    """
+    Generate a SHA-256 hash for a message.
+
+    Args:
+        command (list): Command parameters
+    """
     send_server_message(f"task {' '.join(command)}")
 
     if not wait_server_messages(2):
@@ -552,8 +769,9 @@ def hash_command_hash(command):
 
     message_to_hash = server_messages[1]
 
+    # Generate and send SHA-256 hash
     send_server_message(hashlib.sha256(_decode_message(message_to_hash).encode()).hexdigest())
 
     wait_server_messages(1)
 
-#endregion
+# endregion
