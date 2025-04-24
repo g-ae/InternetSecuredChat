@@ -262,7 +262,7 @@ def send_crypted_server_message(text):
                 for c in message_to_crypt:
                     message_crypted += int_encode(pow(c, e, n), 4)
             case _:
-                show_error_message(f" {type} is not a valide encoding")
+                show_error_message(f"{type} is not a valid encoding")
 
         send_message(_decode_message(message_crypted))
 
@@ -276,15 +276,29 @@ def show_decrypted_server_message(text):
     Args:
         text (str): Command with index of message to decrypt and key
     """
+def show_decrypted_server_message(text) :
+    def missing_args(encoding):
+        error_msg = f"Usage ({encoding}) /decrypt "
+        if encoding == "shift" or encoding == "vigenere":
+            error_msg += "<message_index>"
+        elif encoding == "RSA":
+            error_msg += "<n> <e>"
+        else:
+            error_msg = f"{encoding} can't be used for decryption."
+
+        show_error_message(error_msg)
+        return
+
     command = text.split(' ')
     del command[0]  # Remove "decrypt" from command
 
-    # Check for additional arguments
-    if len(command) == 0:
-        show_error_message("More arguments needed")
-        return
+    # Get chosen encoding
+    encoding = window_interaction.window._get_encoding_values()[0]
 
-    type = window_interaction.window._get_encoding_values()[0]
+    # Check for additional arguments
+    if len(command) < 2:
+        missing_args(encoding)
+        return
 
     try:
         message_decrypted = b''
@@ -292,7 +306,7 @@ def show_decrypted_server_message(text):
         message_to_decrypt = _decode_message(saved_message[-message_num], True)
         key = command[1]
 
-        match type:
+        match encoding:
             case "shift":
                 for i in message_to_decrypt:
                     message_decrypted += int_encode(i - int(key), 4)
@@ -301,12 +315,16 @@ def show_decrypted_server_message(text):
                     intKey = int.from_bytes(key[i % len(key)].encode())
                     message_decrypted += int_encode(c - intKey, 4)
             case "RSA":
+                if len(command) < 3:
+                    missing_args(encoding)
+                    return
+
                 n = int(command[1])
                 d = int(command[2])
                 for c in message_to_decrypt:
                     message_decrypted += int_encode(pow(c, d, n), 4)
             case _:
-                show_error_message(f" {type} is not a valide encoding")
+                show_error_message(f"{encoding} can't be used for decryption.")
 
         comm.decoded_message.emit(_decode_message(message_decrypted))
 
@@ -630,13 +648,15 @@ def hash_command_verify(command):
     if not wait_server_messages_no_empty(3):
         return
 
-    message_to_hash = server_messages[1]
-    hashed = server_messages[2]
+    message = server_messages[1]
+    hash = server_messages[2]
 
     server_messages.clear()
 
-    # Compare hashes and send result
-    send_server_message(str(hashlib.sha256(message_to_hash) == hashed).lower())
+    # Compare the computed hash with the provided hash and convert the result to string.
+    rslt = str(hashlib.sha256(message).hexdigest() == hash)
+
+    send_server_message(rslt.lower())
 
     wait_server_messages_no_empty(1)
 
