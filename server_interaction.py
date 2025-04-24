@@ -280,7 +280,7 @@ def show_decrypted_server_message(text) :
     def missing_args(encoding):
         error_msg = f"Usage ({encoding}) /decrypt "
         if encoding == "shift" or encoding == "vigenere":
-            error_msg += "<message_index>"
+            error_msg += "<message_index> <shift_size>"
         elif encoding == "RSA":
             error_msg += "<n> <e>"
         else:
