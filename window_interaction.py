@@ -7,7 +7,7 @@ from signals import comm
 
 class ChatWindow(QMainWindow):
     """
-    Main application window for the encrypted chat application.
+    Main application window for the chat application.
     Inherits from QMainWindow to create the GUI interface.
     """
 
@@ -197,14 +197,15 @@ class ChatWindow(QMainWindow):
 
 app = QApplication([])
 window = ChatWindow()
-host = "vlbelintrocrypto.hevs.ch"  # Default server host
-port = 6000  # Default server port
+host = "vlbelintrocrypto.hevs.ch"    # Default server host
+port = 6000                          # Default server port
 
 def load_window():
     """
     Initialize and display the application window.
     Handles cleanup on application exit.
     """
+
     window.show()
     app.exec()
     server_interaction.close_connection()

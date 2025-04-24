@@ -4,15 +4,18 @@ import threading, time, re, socket, hashlib
 import window_interaction
 from signals import comm
 
-# Global variables for connection management
-stop_event = threading.Event()  # Event to signal thread termination
-connection: socket.socket = None  # Socket connection to server
-connection_state = -1  # Connection states: -1 (not connected), 0 (failed), 1 (connected)
-last_own_sent_message = ""  # Store last message to prevent duplicates
-server_messages = []  # Store messages received from server
-saved_message = []  # Archive received messages for later use
+# region Variables
 
-# region Message Encoding/Decoding Utilities
+stop_event = threading.Event()      # Event to signal thread termination
+connection: socket.socket = None    # Socket connection to server
+connection_state = -1               # Connection states: -1 (not connected), 0 (failed), 1 (connected)
+last_own_sent_message = ""          # Store last message to prevent duplicates
+server_messages = []                # Store messages received from server
+saved_message = []                  # Archive received messages for later use
+
+# endregion
+
+# region Message Encoding/Decoding Utils
 
 def single_char_encode(chr):
     """
@@ -89,7 +92,7 @@ def _decode_message(text, from_server=False):
 
 # endregion
 
-# region Connection Management
+# region Connection Handling
 
 def open_connection():
     """
@@ -139,7 +142,7 @@ def close_connection():
 
 # endregion
 
-# region Message Handling
+# region Messages Handling
 
 def handle_message_reception():
     """
@@ -323,7 +326,7 @@ def send_server_message_no_encoding(bytes):
 
 # endregion
 
-# region Task Command Processing
+# region Tasks Handling
 
 def server_task_command(text):
     """
@@ -401,10 +404,6 @@ def test_input(text_array):
     send_server_message(f"task {' '.join(text_array)}")
     return 1
 
-# endregion
-
-# region Server Message Waiting Utilities
-
 def wait_server_messages(number_of_messages, max_time=2) -> bool:
     """
     Wait for a specified number of server messages, clearing previous messages first.
@@ -441,7 +440,7 @@ def wait_server_messages_no_empty(number_of_messages, max_time=2) -> bool:
 
 # endregion
 
-# region Encryption Implementations
+# region Encoding Functions
 
 def difhel(text_array):
     """
@@ -560,7 +559,7 @@ def rsa_encode(text_array):
 
 # endregion
 
-# region Decoding Implementations
+# region Decoding Functions
 
 def shift_vigenere_decode(type, text_array):
     """
@@ -616,7 +615,53 @@ def rsa_decode(text_array):
 
 # endregion
 
-# region Prime Number Utility Functions
+# region Hashing Functions
+
+def hash_command_verify(command):
+    """
+    Verify a hash value against a message.
+
+    Args:
+        command (list): Command parameters
+    """
+    server_messages.clear()
+    send_server_message(f"task {' '.join(command)}")
+
+    if not wait_server_messages_no_empty(3):
+        return
+
+    message_to_hash = server_messages[1]
+    hashed = server_messages[2]
+
+    server_messages.clear()
+
+    # Compare hashes and send result
+    send_server_message(str(hashlib.sha256(message_to_hash) == hashed).lower())
+
+    wait_server_messages_no_empty(1)
+
+def hash_command_hash(command):
+    """
+    Generate a SHA-256 hash for a message.
+
+    Args:
+        command (list): Command parameters
+    """
+    send_server_message(f"task {' '.join(command)}")
+
+    if not wait_server_messages(2):
+        return
+
+    message_to_hash = server_messages[1]
+
+    # Generate and send SHA-256 hash
+    send_server_message(hashlib.sha256(_decode_message(message_to_hash).encode()).hexdigest())
+
+    wait_server_messages(1)
+
+# endregion
+
+# region Prime Number Utils
 
 def get_coprime(n):
     """
@@ -727,51 +772,5 @@ def get_prime_factors(n) -> list[int]:
         else:
             curr_divisor = get_next_prime(curr_divisor)
     return prime_factors
-
-# endregion
-
-# region Hashing Functions
-
-def hash_command_verify(command):
-    """
-    Verify a hash value against a message.
-
-    Args:
-        command (list): Command parameters
-    """
-    server_messages.clear()
-    send_server_message(f"task {' '.join(command)}")
-
-    if not wait_server_messages_no_empty(3):
-        return
-
-    message_to_hash = server_messages[1]
-    hashed = server_messages[2]
-
-    server_messages.clear()
-
-    # Compare hashes and send result
-    send_server_message(str(hashlib.sha256(message_to_hash) == hashed).lower())
-
-    wait_server_messages_no_empty(1)
-
-def hash_command_hash(command):
-    """
-    Generate a SHA-256 hash for a message.
-
-    Args:
-        command (list): Command parameters
-    """
-    send_server_message(f"task {' '.join(command)}")
-
-    if not wait_server_messages(2):
-        return
-
-    message_to_hash = server_messages[1]
-
-    # Generate and send SHA-256 hash
-    send_server_message(hashlib.sha256(_decode_message(message_to_hash).encode()).hexdigest())
-
-    wait_server_messages(1)
 
 # endregion
