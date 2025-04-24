@@ -7,7 +7,7 @@ from signals import comm
 # region Variables
 
 stop_event = threading.Event()      # Event to signal thread termination
-connection: socket.socket = None    # Socket connection to server
+connection: socket.socket = None              # Socket connection to server
 connection_state = -1               # Connection states: -1 (not connected), 0 (failed), 1 (connected)
 last_own_sent_message = ""          # Store last message to prevent duplicates
 server_messages = []                # Store messages received from server
@@ -269,14 +269,14 @@ def send_crypted_server_message(text):
     except:
         show_error_message(f"Invalid arguments, try again")
 
-def show_decrypted_server_message(text):
+def show_decrypted_server_message(text) :
     """
     Decrypt and display a previously received message.
 
     Args:
         text (str): Command with index of message to decrypt and key
     """
-def show_decrypted_server_message(text) :
+
     def missing_args(encoding):
         error_msg = f"Usage ({encoding}) /decrypt "
         if encoding == "shift" or encoding == "vigenere":
